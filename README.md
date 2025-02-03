@@ -9,7 +9,7 @@ Ein Python-Tool zur Analyse der Verarbeitungszeiten von Bildern im System - von 
 - Erstellt eine übersichtliche Heatmap zur Visualisierung von:
   - Wochentagen mit hoher Auslastung
   - Tageszeiten mit längeren Verarbeitungszeiten
-- Liefert aussagekräftige Statistiken
+- Liefert  Statistiken
 
 ## Voraussetzungen 📋
 
