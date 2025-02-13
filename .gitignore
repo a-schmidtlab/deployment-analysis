@@ -37,3 +37,5 @@ env/
 
 # Excel temp files
 ~$*.xlsx 
+
+.DS_Store
