@@ -669,11 +669,6 @@ class SimpleAnalysisGUI:
         self.min_delay_label = ttk.Label(self.stats_frame, text="Min: 0 min")
         self.max_delay_label = ttk.Label(self.stats_frame, text="Max: 0 min")
         
-        # Run button - commented out to remove from GUI
-        # self.run_button = ttk.Button(self.control_panel, text="Run Analysis", command=self.run_analysis)
-        # Create a dummy button object that's not shown in UI but responds to all method calls
-        self.run_button = ttk.Button(self.root)  # Create but don't add to layout
-        
         # VISUALIZATION FRAME WIDGETS -------------------------
         # Canvas for the heatmap
         self.canvas_frame = ttk.Frame(self.visualization_frame)
@@ -721,7 +716,6 @@ class SimpleAnalysisGUI:
         # Configure the control panel for better spacing
         self.control_panel.columnconfigure(0, weight=2)  # File frame
         self.control_panel.columnconfigure(1, weight=2)  # Stats frame
-        self.control_panel.columnconfigure(2, weight=0)  # Run button
         
         # CONTROL PANEL LAYOUT -------------------------
         # File selection frame
@@ -740,9 +734,6 @@ class SimpleAnalysisGUI:
         self.avg_delay_label.pack(side="left", **padding)
         self.min_delay_label.pack(side="left", **padding)
         self.max_delay_label.pack(side="left", **padding)
-        
-        # Run button - commented out to remove from GUI
-        # self.run_button.grid(row=0, column=2, sticky="e", **padding)
         
         # VISUALIZATION FRAME LAYOUT -------------------------
         # Canvas - make it dominant by spanning the entire space
@@ -802,7 +793,6 @@ class SimpleAnalysisGUI:
             self.path_var.set(file_path)
             
             # Disable buttons during analysis
-            self.run_button.config(state="disabled")
             self.add_file_button.config(state="disabled")
             
             # Update status to show we're processing
@@ -880,7 +870,6 @@ class SimpleAnalysisGUI:
                 # Handle failed import
                 if self.is_running:
                     self.root.after(0, lambda: self.update_status("Error importing file"))
-                    self.root.after(0, lambda: self.run_button.config(state="normal"))
                     self.root.after(0, lambda: self.add_file_button.config(state="normal"))
                 
         except Exception as e:
@@ -889,7 +878,6 @@ class SimpleAnalysisGUI:
                 error_msg = f"Error processing file: {str(e)}"
                 self.root.after(0, lambda: messagebox.showerror("Error", error_msg))
                 self.root.after(0, lambda: self.update_status("Error processing file"))
-                self.root.after(0, lambda: self.run_button.config(state="normal"))
                 self.root.after(0, lambda: self.add_file_button.config(state="normal"))
                 print(f"Error in _browse_file_thread: {str(e)}")
             
@@ -908,7 +896,6 @@ class SimpleAnalysisGUI:
         if file_path:
             # Start processing in a separate thread
             self.update_status("Adding file, please wait...", progress=True)
-            self.run_button.config(state="disabled")
             self.add_file_button.config(state="disabled")
             
             thread = threading.Thread(target=self._add_file_thread, args=(file_path,))
@@ -977,13 +964,11 @@ class SimpleAnalysisGUI:
                 self.root.after(0, lambda: self.update_status(f"Added file: {os.path.basename(file_path)}"))
                 
                 # Enable buttons
-                self.root.after(0, lambda: self.run_button.config(state="normal"))
                 self.root.after(0, lambda: self.add_file_button.config(state="normal"))
             else:
                 # Update status for error
                 if self.is_running:
                     self.root.after(0, lambda: self.update_status("Error adding file"))
-                    self.root.after(0, lambda: self.run_button.config(state="normal"))
                     self.root.after(0, lambda: self.add_file_button.config(state="normal"))
                 
         except Exception as e:
@@ -992,89 +977,9 @@ class SimpleAnalysisGUI:
                 error_msg = f"Error adding file: {str(e)}"
                 self.root.after(0, lambda: messagebox.showerror("Error", error_msg))
                 self.root.after(0, lambda: self.update_status("Error adding file"))
-                self.root.after(0, lambda: self.run_button.config(state="normal"))
                 self.root.after(0, lambda: self.add_file_button.config(state="normal"))
                 print(f"Error in _add_file_thread: {str(e)}")
             
-    def run_analysis(self):
-        """Run the analysis and display results."""
-        if not self.file_path:
-            messagebox.showwarning("No File Selected", "Please select a file to analyze first.")
-            return
-        
-        # Disable buttons during analysis
-        self.run_button.config(state="disabled")
-        self.add_file_button.config(state="disabled")
-        
-        # Update status to show we're processing
-        self.update_status("Running analysis...", progress=True)
-        
-        # Run the analysis in a separate thread
-        thread = threading.Thread(target=self._run_analysis_thread)
-        thread.daemon = True
-        self.running_threads.append(thread)
-        thread.start()
-
-    def _run_analysis_thread(self):
-        """Analyze the file in a separate thread."""
-        try:
-            # Only proceed if the application is still running
-            if not self.is_running:
-                return
-        
-            self.root.after(0, lambda: self.update_status("Importing file...", progress=True))
-            self.analyzer.import_file(self.file_path)
-            
-            # Process the data
-            if not self.is_running:
-                return
-            
-            self.root.after(0, lambda: self.update_status("Processing data...", progress=True))
-            self.analyzer.process_data()
-            
-            # Update the UI with available time periods 
-            if not self.is_running:
-                return
-            
-            self.root.after(0, self.update_time_period_buttons)
-            
-            # Create pivot table based on selected granularity
-            if not self.is_running:
-                return
-            
-            granularity = self.selected_granularity.get()
-            if granularity == "combined":
-                self.analyzer.create_pivot_table(granularity="hourly")
-            else:
-                self.analyzer.create_pivot_table(granularity=granularity)
-            
-            # Store the pivot table for the main thread to use
-            if not self.is_running:
-                return
-            
-            self.current_pivot_table = self.analyzer.pivot_table.copy()
-            self.current_granularity = granularity
-            
-            # Signal main thread to create the heatmap with the prepared data
-            self.root.after(0, self._create_heatmap_main_thread)
-            
-            # Update statistics
-            if not self.is_running:
-                return
-            
-            stats = self.analyzer.get_statistics()
-            self.root.after(0, lambda: self._update_stats_from_dict(stats))
-            
-        except Exception as e:
-            # Handle any exceptions
-            if self.is_running:
-                error_msg = f"Error in analysis: {str(e)}"
-                self.root.after(0, lambda: messagebox.showerror("Error", error_msg))
-                self.root.after(0, lambda: self.update_status("Error in analysis"))
-                self.root.after(0, lambda: self.run_button.config(state="normal"))
-                self.root.after(0, lambda: self.add_file_button.config(state="normal"))
-                print(f"Error in _run_analysis_thread: {str(e)}")
-    
     def _create_heatmap(self):
         """Create a heatmap visualization from the pivot table."""
         # This method should only be called from the main thread
@@ -1084,7 +989,6 @@ class SimpleAnalysisGUI:
                 error_msg = "No data available to create heatmap"
                 self._create_error_figure(error_msg)
                 self.update_status("No data to visualize")
-                self.run_button.config(state="normal")
                 self.add_file_button.config(state="normal")
                 return
             
@@ -1144,7 +1048,6 @@ class SimpleAnalysisGUI:
             self.display_figure(fig)
             
             # Re-enable buttons
-            self.run_button.config(state="normal")
             self.add_file_button.config(state="normal")
             
         except Exception as e:
@@ -1153,7 +1056,6 @@ class SimpleAnalysisGUI:
             # Create an error figure
             self._create_error_figure(error_msg)
             # Re-enable buttons
-            self.run_button.config(state="normal")
             self.add_file_button.config(state="normal")
     
     def update_visualization(self):
@@ -1163,7 +1065,6 @@ class SimpleAnalysisGUI:
             return
             
         # Disable buttons during update
-        self.run_button.config(state="disabled")
         self.add_file_button.config(state="disabled")
         
         # Update status
@@ -1199,7 +1100,6 @@ class SimpleAnalysisGUI:
             if self.analyzer.pivot_table is None or self.analyzer.pivot_table.empty:
                 # Signal main thread to show error
                 self.root.after(0, lambda: self.update_status("No data to visualize"))
-                self.root.after(0, lambda: self.run_button.config(state="normal"))
                 self.root.after(0, lambda: self.add_file_button.config(state="normal"))
                 return
                 
@@ -1223,7 +1123,6 @@ class SimpleAnalysisGUI:
                 print(error_msg)
                 self.root.after(0, lambda: self.update_status("Error updating visualization"))
                 self.root.after(0, lambda: messagebox.showerror("Error", error_msg))
-                self.root.after(0, lambda: self.run_button.config(state="normal"))
                 self.root.after(0, lambda: self.add_file_button.config(state="normal"))
             
     def _create_heatmap_main_thread(self):
@@ -1236,7 +1135,6 @@ class SimpleAnalysisGUI:
             # Check if data is available (should be, but check anyway)
             if pivot_table is None or pivot_table.empty:
                 self.update_status("No data to visualize")
-                self.run_button.config(state="normal")
                 self.add_file_button.config(state="normal")
                 return
             
@@ -1347,21 +1245,7 @@ class SimpleAnalysisGUI:
                 print("Could not even create error figure")
         finally:
             # Always re-enable buttons
-            self.run_button.config(state="normal")
             self.add_file_button.config(state="normal")
-    
-    def update_statistics(self):
-        """Update the statistics display."""
-        stats = self.analyzer.get_statistics()
-        
-        self.total_records_label.config(
-            text=f"Total Records: {stats['total_records']:,}")
-        self.avg_delay_label.config(
-            text=f"Average Delay: {stats['avg_delay']:.1f} min")
-        self.min_delay_label.config(
-            text=f"Min Delay: {stats['min_delay']:.1f} min")
-        self.max_delay_label.config(
-            text=f"Max Delay: {stats['max_delay']:.1f} min")
     
     def update_time_period_buttons(self):
         """Update the time period buttons based on available data."""
@@ -1732,171 +1616,6 @@ class SimpleAnalysisGUI:
             # Always re-enable the button
             self.root.after(0, lambda: self.run_button.config(state="normal"))
     
-    def update_statistics(self):
-        """Update the statistics display."""
-        stats = self.analyzer.get_statistics()
-        
-        self.total_records_label.config(
-            text=f"Total Records: {stats['total_records']}")
-        self.avg_delay_label.config(
-            text=f"Average Delay: {stats['avg_delay']:.1f} min")
-        self.min_delay_label.config(
-            text=f"Min Delay: {stats['min_delay']:.1f} min")
-        self.max_delay_label.config(
-            text=f"Max Delay: {stats['max_delay']:.1f} min")
-    
-    def export_heatmap(self):
-        """Export the current heatmap to a file."""
-        if self.current_figure is None:
-            messagebox.showwarning("No Visualization", "Please run the analysis first.")
-            return
-            
-        file_path = filedialog.asksaveasfilename(
-            title="Save Heatmap",
-            defaultextension=".png",
-            filetypes=[
-                ("PNG Image", "*.png"),
-                ("PDF Document", "*.pdf"),
-                ("SVG Image", "*.svg"),
-                ("JPEG Image", "*.jpg"),
-                ("All Files", "*.*")
-            ]
-        )
-        
-        if file_path:
-            try:
-                self.update_status(f"Exporting heatmap to {file_path}")
-                
-                success = self.analyzer.save_heatmap(self.current_figure, file_path)
-                
-                if success:
-                    self.update_status(f"Heatmap exported to {os.path.basename(file_path)}")
-                else:
-                    self.update_status("Error exporting heatmap")
-                    
-            except Exception as e:
-                error_msg = f"Error exporting heatmap: {str(e)}"
-                messagebox.showerror("Export Error", error_msg)
-                self.update_status("Error exporting heatmap")
-    
-    def export_data(self):
-        """Export the cleaned data to a file."""
-        if self.analyzer.cleaned_data is None:
-            messagebox.showwarning("No Data", "Please run the analysis first.")
-            return
-            
-        file_path = filedialog.asksaveasfilename(
-            title="Export Data",
-            defaultextension=".csv",
-            filetypes=[
-                ("CSV File", "*.csv"),
-                ("Excel File", "*.xlsx"),
-                ("All Files", "*.*")
-            ]
-        )
-        
-        if file_path:
-            try:
-                self.update_status(f"Exporting data to {file_path}")
-                
-                success = self.analyzer.export_data(file_path)
-                
-                if success:
-                    self.update_status(f"Data exported to {os.path.basename(file_path)}")
-                else:
-                    self.update_status("Error exporting data")
-                    
-            except Exception as e:
-                error_msg = f"Error exporting data: {str(e)}"
-                messagebox.showerror("Export Error", error_msg)
-                self.update_status("Error exporting data")
-    
-    def show_help(self):
-        """Show a help dialog."""
-        help_window = tk.Toplevel(self.root)
-        help_window.title("Help - Image Deployment Analysis")
-        help_window.geometry("600x500")
-        help_window.minsize(500, 400)
-        
-        # Create a frame with scrollable text
-        frame = ttk.Frame(help_window)
-        frame.pack(fill="both", expand=True, padx=10, pady=10)
-        
-        # Add a scrollbar
-        scrollbar = ttk.Scrollbar(frame)
-        scrollbar.pack(side="right", fill="y")
-        
-        # Create a text widget with the scrollbar
-        text = tk.Text(frame, wrap="word", yscrollcommand=scrollbar.set)
-        text.pack(side="left", fill="both", expand=True)
-        scrollbar.config(command=text.yview)
-        
-        # Help text
-        help_text = """
-        # Image Deployment Analysis Tool - Help
-        
-        This tool analyzes the processing delays in image deployment systems.
-        
-        ## Getting Started
-        
-        1. Use the 'Browse...' button to select your Excel or CSV file.
-        2. Click the 'Run Analysis' button to process the data.
-        3. Use the time period controls at the bottom to navigate different views.
-        
-        ## Screen Layout
-        
-        The screen is divided into three main sections:
-        
-        1. **Top Control Panel**: Contains file selection, statistics, and the current view indicator.
-        2. **Center Visualization Area**: Displays the heatmap visualization (the main focus).
-        3. **Bottom Navigation Panel**: Contains the time period selection controls.
-        
-        ## View Types
-        
-        You can select from four different view types:
-        
-        - **Daily (By Month)**: Shows daily patterns within a selected month, with days on the Y-axis and hours on the X-axis.
-        - **Daily (By Week)**: Shows daily patterns within a selected week, with weekdays on the Y-axis and hours on the X-axis.
-        - **Monthly (By Year)**: Shows monthly patterns within a selected year, with months on the Y-axis and hours on the X-axis.
-        - **Combined**: Shows aggregate data by hour across all available data.
-        
-        ## Time Period Navigation
-        
-        The hierarchical time period buttons allow you to:
-        
-        - Select a specific year to view its monthly pattern
-        - Select a specific month to view its daily pattern
-        - Select a specific week to view its daily pattern
-        
-        ## Understanding the Heatmap
-        
-        - The heatmap displays average processing delays across time periods.
-        - Darker/more intense colors indicate longer processing delays.
-        - The scale is in minutes.
-        
-        ## Exporting Results
-        
-        - Use the 'Export Image' button to save the current heatmap visualization as a PNG file.
-        - Use the 'Export Data' button to save the processed data as a CSV or Excel file.
-        
-        ## Adding More Data
-        
-        You can add additional data files by clicking the '+ Add Data' button. This allows you to:
-        
-        - Combine multiple data sources for analysis
-        - Compare different time periods or systems
-        - Build a more comprehensive dataset
-        
-        """
-        
-        # Insert the help text
-        text.insert("1.0", help_text)
-        text.config(state="disabled")  # Make it read-only
-        
-        # Add a close button
-        close_button = ttk.Button(help_window, text="Close", command=help_window.destroy)
-        close_button.pack(pady=10)
-
     def _update_stats_from_dict(self, stats):
         """Update the statistics labels with values from the stats dictionary."""
         try:
