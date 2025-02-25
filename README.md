@@ -145,3 +145,122 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - Michael Gottschalk for the concept
 - PyQt6 team for the GUI framework
+
+# Image Distribution Analysis Tool
+
+A comprehensive tool for analyzing image distribution workflows, detecting anomalies, and identifying patterns in processing delays.
+
+## Overview
+
+This tool helps analyze the distribution of images from receipt to publication, providing insights into:
+
+- Processing delays across different time periods
+- Anomaly detection for identifying unusual processing patterns
+- Timeline analysis for understanding peak times and bottlenecks
+- Distribution patterns by weekday and hour
+
+## Project Structure
+
+```
+├── data/
+│   ├── raw/             # Raw CSV data files
+│   └── processed/       # Processed data and database files
+├── src/
+│   ├── modules/
+│   │   ├── data_preparation/
+│   │   │   ├── csv_importer.py
+│   │   │   ├── data_cleaner.py
+│   │   │   └── database.py
+│   │   ├── interactive_analysis/
+│   │   │   ├── timeline_analyzer.py
+│   │   │   ├── anomaly_detector.py
+│   │   │   └── dashboard.py
+│   │   └── reporting_engine/
+│   │       └── report_generator.py
+│   ├── cli.py           # Command-line interface
+│   └── run_dashboard.py # Dashboard runner
+└── requirements.txt     # Project dependencies
+```
+
+## Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/image-distribution-analysis.git
+cd image-distribution-analysis
+```
+
+2. Create a virtual environment (optional but recommended):
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+## Usage
+
+### Command-line Interface
+
+The tool provides a command-line interface for various operations:
+
+#### Import Data
+
+Import and process CSV data:
+```bash
+python src/cli.py import --file data/raw/deployments.csv
+```
+
+#### Analyze Timeline
+
+Analyze time patterns in the data:
+```bash
+python src/cli.py analyze --data-dir data/processed --granularity hour
+```
+
+#### Detect Anomalies
+
+Detect anomalies in processing delays:
+```bash
+python src/cli.py anomaly --data-dir data/processed --method zscore
+```
+
+### Interactive Dashboard
+
+The tool includes an interactive web dashboard for data exploration and analysis:
+
+1. Start the dashboard:
+```bash
+python src/run_dashboard.py --db-path data/processed/deployments.db
+```
+
+2. Open your web browser and navigate to `http://127.0.0.1:8050`
+
+3. Use the dashboard to:
+   - Select date ranges for analysis
+   - Visualize time patterns through line charts
+   - Explore weekday-hour heatmaps for pattern identification
+   - Detect and visualize anomalies with various methods
+
+Dashboard options:
+- `--port`: Specify the port to run the dashboard (default: 8050)
+- `--debug`: Run in debug mode with auto-reloading
+- `--db-path`: Specify the path to the database file (default: data/processed/deployments.db)
+
+## Dependencies
+
+- pandas: Data manipulation and analysis
+- numpy: Numerical computing
+- matplotlib: Plotting library
+- plotly: Interactive visualizations
+- dash: Web application framework for dashboard
+- dash-bootstrap-components: Bootstrap components for Dash
+- scikit-learn: Machine learning algorithms for anomaly detection
+- sqlite3: Database storage (built-in with Python)
+
+## License
+
+[MIT License](LICENSE)
