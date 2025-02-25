@@ -360,26 +360,26 @@ class DeploymentAnalyzer:
             pivot.index = [month_names.get(m, m) for m in pivot.index]
             
         elif granularity == "yearly":
-            # Pivot by month and day of month for the year view
-            data['Month'] = data['Bildankunft'].dt.month
-            data['Day'] = data['Bildankunft'].dt.day
+            # Create a date column combining year, month, and day for each entry
+            data['Date'] = pd.to_datetime(data['Bildankunft'].dt.date)
+            data['Hour'] = data['Bildankunft'].dt.hour
             
+            # Sort the data by date for a chronological view
+            data = data.sort_values('Date')
+            
+            # Create pivot table with date as index and hour as columns
             pivot = pd.pivot_table(
                 data,
                 values='Verzögerung_Minuten',
-                index='Month',
-                columns='Day',
+                index='Date',
+                columns='Hour',
                 aggfunc='mean',
                 fill_value=0
             )
             
-            # Map month numbers to month names
-            month_names = {
-                1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
-                7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'
-            }
-            pivot.index = [month_names.get(m, m) for m in pivot.index]
-            
+            # Format the date index to be more readable
+            pivot.index = [d.strftime('%b %d') for d in pivot.index]
+        
         else:  # "hourly" (combined view)
             # Pivot by hour only, combining all dates
             data['Hour'] = data['Bildankunft'].dt.hour
@@ -424,10 +424,26 @@ class DeploymentAnalyzer:
             # Close any existing figures to prevent thread issues
             plt.close('all')
 
+            # Get dimensions of the pivot table
+            rows = len(self.pivot_table.index)
+            cols = len(self.pivot_table.columns)
+            
+            # Define standard dimensions for complete datasets to ensure consistent square sizes
+            standard_rows = {"monthly": 31, "weekly": 7, "yearly": rows, "daily": rows}
+            standard_cols = 24  # Hours in a day
+            
+            # Adjust figure size based on standard dimensions for consistent square sizes
+            if granularity in ['weekly', 'monthly']:
+                std_rows = standard_rows.get(granularity, rows)
+                # Calculate figure size based on standard dimensions rather than actual data size
+                adjusted_height = max(8, min(std_rows * 0.4, 16))
+                adjusted_width = max(10, min(standard_cols * 0.8, 20))
+                figsize = (adjusted_width, adjusted_height)
+
             # Create new figure
             fig, ax = plt.subplots(figsize=figsize)
             
-            # Set aspect ratio for consistent cell sizes - only for weekly and monthly views
+            # Always set aspect ratio to 'equal' for weekly and monthly views to ensure square cells
             if granularity in ['weekly', 'monthly']:
                 ax.set_aspect('equal', adjustable='box', anchor='C')
             
@@ -1098,10 +1114,17 @@ class SimpleAnalysisGUI:
             # Set titles and labels
             current_granularity = self.selected_granularity.get()
             title = f"Deployment Delays"
-            if current_granularity == "monthly":
+            
+            # Set smaller font size for tick labels in year view to make dates fit better
+            if current_granularity == "yearly":
+                # Reduce font size for both x and y tick labels
+                plt.setp(ax.get_xticklabels(), fontsize=6, rotation=45, ha='right')
+                plt.setp(ax.get_yticklabels(), fontsize=6)
+                # Rotate y-axis tick labels to fit better
+                plt.setp(ax.get_yticklabels(), rotation=0)
+                subtitle = f"Yearly View for {self.selected_year} (Date × Hour)"
+            elif current_granularity == "monthly":
                 subtitle = "Monthly View (Day × Hour)"
-            elif current_granularity == "yearly":
-                subtitle = "Yearly View (Month × Hour)"
             elif current_granularity == "weekly":
                 subtitle = "Weekly View (Day × Hour)"
             else:
@@ -1216,18 +1239,39 @@ class SimpleAnalysisGUI:
                 return
             
             # Calculate figure size dynamically based on data dimensions
-            height = max(8, min(len(pivot_table.index) * 0.4, 16))
-            width = max(10, min(len(pivot_table.columns) * 0.8, 20))
+            # For large datasets, use a more conservative scaling to prevent overflow
+            rows = len(pivot_table.index)
+            cols = len(pivot_table.columns)
+            
+            # Define standard dimensions for complete datasets to ensure consistent square sizes
+            standard_rows = {"monthly": 31, "weekly": 7, "yearly": rows, "hourly": 1}
+            standard_cols = 24  # Hours in a day
+            
+            # Use standard dimensions for calculating aspect ratio to ensure consistent square sizes
+            if current_granularity in ['monthly', 'weekly']:
+                std_rows = standard_rows.get(current_granularity, rows)
+                # Calculate figure size based on standard dimensions rather than actual data size
+                # This ensures consistent square sizes regardless of dataset completeness
+                height = max(8, min(std_rows * 0.4, 16))
+                width = max(10, min(standard_cols * 0.8, 20))
+            else:
+                # For other views, use the actual data dimensions
+                if rows > 20 or cols > 24:
+                    height = max(8, min(rows * 0.3, 14))
+                    width = max(10, min(cols * 0.6, 18))
+                else:
+                    height = max(8, min(rows * 0.4, 16))
+                    width = max(10, min(cols * 0.8, 20))
             
             # Use non-interactive backend to avoid thread issues
             import matplotlib
             default_backend = matplotlib.get_backend()
             matplotlib.use('Agg')
             
-            # Create the figure
+            # Create the figure with extra padding for title and labels
             fig, ax = plt.subplots(figsize=(width, height))
             
-            # Set aspect ratio for consistent cell sizes - only for weekly and monthly views
+            # Always set aspect ratio to 'equal' for weekly and monthly views to ensure square cells
             if current_granularity in ['weekly', 'monthly']:
                 ax.set_aspect('equal', adjustable='box', anchor='C')
             
@@ -1244,19 +1288,31 @@ class SimpleAnalysisGUI:
             # Set titles and labels
             current_granularity = self.selected_granularity.get()
             title = f"Deployment Delays"
-            if current_granularity == "monthly":
+            
+            # Set smaller font size for tick labels in year view to make dates fit better
+            if current_granularity == "yearly":
+                # Reduce font size for both x and y tick labels
+                plt.setp(ax.get_xticklabels(), fontsize=6, rotation=45, ha='right')
+                plt.setp(ax.get_yticklabels(), fontsize=6)
+                # Rotate y-axis tick labels to fit better
+                plt.setp(ax.get_yticklabels(), rotation=0)
+                subtitle = f"Yearly View for {self.selected_year} (Date × Hour)"
+            elif current_granularity == "monthly":
                 subtitle = "Monthly View (Day × Hour)"
-            elif current_granularity == "yearly":
-                subtitle = f"Yearly View for {self.selected_year} (Month × Day)"
             elif current_granularity == "weekly":
                 subtitle = "Weekly View (Day × Hour)"
             else:
                 subtitle = "Combined View"
             
-            ax.set_title(f"{title}\n{subtitle}", fontsize=14)
+            # Use a smaller font size for the title on large heatmaps
+            title_fontsize = 14 if (rows <= 20 and cols <= 24) else 12
+            ax.set_title(f"{title}\n{subtitle}", fontsize=title_fontsize, pad=10)
             
-            # Adjust layout
-            plt.tight_layout()
+            # Adjust layout with explicit padding for large heatmaps
+            if rows > 20 or cols > 24:
+                plt.tight_layout(pad=1.5, h_pad=1.0, w_pad=1.0, rect=[0.05, 0.05, 0.95, 0.95])
+            else:
+                plt.tight_layout()
             
             # Switch back to the original backend
             matplotlib.use(default_backend)
@@ -1932,17 +1988,37 @@ class SimpleAnalysisGUI:
             for widget in self.canvas_frame.winfo_children():
                 widget.destroy()
             
-            # Create a new canvas
-            canvas = FigureCanvasTkAgg(figure_to_display, master=self.canvas_frame)
+            # Create a scrollable frame for large figures
+            canvas_scroll_frame = ttk.Frame(self.canvas_frame)
+            canvas_scroll_frame.pack(fill="both", expand=True)
+            
+            # Add scrollbars for large figures
+            h_scrollbar = ttk.Scrollbar(canvas_scroll_frame, orient="horizontal")
+            v_scrollbar = ttk.Scrollbar(canvas_scroll_frame, orient="vertical")
+            
+            # Create a new canvas with scrollbars
+            canvas = FigureCanvasTkAgg(figure_to_display, master=canvas_scroll_frame)
             canvas.draw()
             
-            # Pack the canvas (use pack to match the rest of the layout)
+            # Get the canvas widget and configure with scrollbars
             canvas_widget = canvas.get_tk_widget()
-            canvas_widget.pack(fill="both", expand=True)
+            
+            # Configure scrollbars
+            h_scrollbar.config(command=canvas_widget.xview)
+            v_scrollbar.config(command=canvas_widget.yview)
+            canvas_widget.config(xscrollcommand=h_scrollbar.set, yscrollcommand=v_scrollbar.set)
+            
+            # Pack scrollbars and canvas
+            h_scrollbar.pack(side="bottom", fill="x")
+            v_scrollbar.pack(side="right", fill="y")
+            canvas_widget.pack(side="left", fill="both", expand=True)
+            
+            # Make the canvas scrollable
+            canvas_widget.config(scrollregion=canvas_widget.bbox("all"))
             
             # Add toolbar if not an error message
             if not getattr(figure_to_display, 'is_error_figure', False):
-                toolbar = NavigationToolbar2Tk(canvas, self.canvas_frame)
+                toolbar = NavigationToolbar2Tk(canvas, canvas_scroll_frame)
                 toolbar.update()
                 toolbar.pack(side="bottom", fill="x")
             
