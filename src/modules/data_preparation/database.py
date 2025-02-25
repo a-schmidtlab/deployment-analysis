@@ -8,6 +8,7 @@ image distribution data from a structured database.
 import os
 import sqlite3
 import pandas as pd
+import numpy as np
 import logging
 from datetime import datetime
 import json
@@ -184,6 +185,9 @@ class Database:
             # Add source file and import timestamp
             df_for_db['source_file'] = source_file
             df_for_db['import_timestamp'] = import_timestamp
+            
+            # Handle NA values by replacing them with None
+            df_for_db = df_for_db.replace({pd.NA: None})
             
             # Insert data row by row (less efficient but safer)
             for _, row in df_for_db.iterrows():
