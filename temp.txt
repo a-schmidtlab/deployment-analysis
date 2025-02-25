@@ -1,0 +1,748 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""
+Simple Image Deployment Analysis Tool
+
+A simplified GUI application for analyzing image deployment delays.
+This tool allows importing Excel/CSV files and visualizing processing delays
+with options to customize the analysis and dive deeper when needed.
+"""
+
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from datetime import datetime, timedelta
+import locale
+import os
+import argparse
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox
+from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk
+import threading
+import numpy as np
+import matplotlib
+import queue
+import logging
+import sys
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
+
+# Configure logging
+def setup_logging():
+    """Set up logging to both file and console with rotation."""
+    # Create logs directory if it doesn't exist
+    logs_dir = Path("logs")
+    logs_dir.mkdir(exist_ok=True)
+    
+    # Configure root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)  # Capture all levels
+    
+    # File handler with rotation (5 files, 5MB each)
+    log_file = logs_dir / "deployment_analysis.log"
+    file_handler = RotatingFileHandler(
+        log_file, 
+        maxBytes=5*1024*1024,  # 5MB
+        backupCount=5,
+        encoding='utf-8'
+    )
+    file_handler.setLevel(logging.DEBUG)
+    file_format = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+    )
+    file_handler.setFormatter(file_format)
+    
+    # Console handler (less verbose)
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    console_format = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    console_handler.setFormatter(console_format)
+    
+    # Add handlers
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(console_handler)
+    
+    logging.info("Logging system initialized")
+    return root_logger
+
+# Initialize logger
+logger = setup_logging()
+
+# Use non-interactive backend to avoid thread issues
+matplotlib.use('Agg')
+logger.info("Using Agg backend for matplotlib")
+
+# Set backend to TkAgg for GUI applications
+matplotlib.use('TkAgg')
+import csv
+
+# Configure locale for German weekday names
+try:
+    locale.setlocale(locale.LC_TIME, 'de_DE.UTF-8')
+except:
+    try:
+        locale.setlocale(locale.LC_TIME, 'German')
+    except:
+        pass  # If neither works, use system default
+
+class DeploymentAnalyzer:
+    """
+    Class for analyzing deployment data from Excel/CSV files.
+    """
+    
+    def __init__(self):
+        """Initialize the analyzer with empty data structures."""
+        self.df = None
+        self.cleaned_data = None
+        self.pivot_table = None
+        self.loaded_files = []
+        self.skipped_rows = {}  # Track skipped rows per file
+        self.import_stats = {}  # Statistics about file imports
+        logger.debug("DeploymentAnalyzer initialized")
+        
+    def import_file(self, file_path):
+        """
+        Import data from Excel or CSV file.
+        
+        Args:
+            file_path: Path to the Excel or CSV file
+            
+        Returns:
+            DataFrame: The imported data
+        """
+        logger.info(f"Importing file: {file_path}")
+        try:
+            # Get file extension
+            _, ext = os.path.splitext(file_path)
+            
+            # Try to import based on file extension
+            if ext.lower() in ['.xlsx', '.xls']:
+                logger.debug(f"Importing as Excel file: {file_path}")
+                self.cleaned_data = pd.read_excel(file_path)
+                self.loaded_files = [os.path.basename(file_path)]
+                self.import_stats = {os.path.basename(file_path): {'total': len(self.cleaned_data), 'skipped': 0}}
+            else:  # Default to CSV
+                # Try different delimiters
+                for delimiter in [';', ',', '\t']:
+                    try:
+                        logger.debug(f"Trying delimiter '{delimiter}' for {file_path}")
+                        self.cleaned_data = pd.read_csv(file_path, delimiter=delimiter)
+                        if len(self.cleaned_data.columns) > 1:
+                            logger.debug(f"Successfully used delimiter '{delimiter}' for {file_path}")
+                            break
+                    except:
+                        logger.debug(f"Delimiter '{delimiter}' failed for {file_path}")
+                        continue
+                
+                self.loaded_files = [os.path.basename(file_path)]
+                self.import_stats = {os.path.basename(file_path): {'total': len(self.cleaned_data), 'skipped': 0}}
+                
+            logger.info(f"Successfully imported {len(self.cleaned_data)} rows from {file_path}")
+            return self.process_data()
+        except Exception as e:
+            logger.error(f"Error importing file {file_path}: {str(e)}", exc_info=True)
+            messagebox.showerror("Import Error", f"Could not import the file: {str(e)}")
+            return False
+            
+    def add_file(self, file_path):
+        """
+        Add data from another file to the existing dataset.
+        
+        Args:
+            file_path: Path to the Excel or CSV file
+            
+        Returns:
+            DataFrame: The combined data
+        """
+        logger.info(f"Adding file: {file_path}")
+        try:
+            # Get file extension
+            _, ext = os.path.splitext(file_path)
+            
+            # Try to import based on file extension
+            if ext.lower() in ['.xlsx', '.xls']:
+                logger.debug(f"Adding Excel file: {file_path}")
+                new_data = pd.read_excel(file_path)
+            else:  # Default to CSV
+                # Try different delimiters
+                for delimiter in [';', ',', '\t']:
+                    try:
+                        logger.debug(f"Trying delimiter '{delimiter}' for {file_path}")
+                        new_data = pd.read_csv(file_path, delimiter=delimiter)
+                        if len(new_data.columns) > 1:
+                            logger.debug(f"Successfully used delimiter '{delimiter}' for {file_path}")
+                            break
+                    except:
+                        logger.debug(f"Delimiter '{delimiter}' failed for {file_path}")
+                        continue
+            
+            # Check if we have existing data
+            if self.cleaned_data is None:
+                logger.debug("No existing data, using new data as base")
+                self.cleaned_data = new_data
+                self.loaded_files = [os.path.basename(file_path)]
+                self.import_stats = {os.path.basename(file_path): {'total': len(new_data), 'skipped': 0}}
+            else:
+                # Append new data
+                logger.debug(f"Appending {len(new_data)} rows to existing {len(self.cleaned_data)} rows")
+                initial_len = len(self.cleaned_data)
+                self.cleaned_data = pd.concat([self.cleaned_data, new_data], ignore_index=True)
+                
+                # Record file info
+                filename = os.path.basename(file_path)
+                self.loaded_files.append(filename)
+                self.import_stats[filename] = {'total': len(new_data), 'skipped': 0}
+                
+                logger.info(f"Added {len(new_data)} rows from {file_path}")
+            
+            return self.process_data()
+        except Exception as e:
+            logger.error(f"Error adding file {file_path}: {str(e)}", exc_info=True)
+            messagebox.showerror("Import Error", f"Could not add the file: {str(e)}")
+            return False
+    
+    def process_data(self):
+        """
+        Clean and process the raw data.
+        
+        Returns:
+            DataFrame: The cleaned data
+        """
+        logger.info("Processing data")
+        try:
+            if self.cleaned_data is None or len(self.cleaned_data) == 0:
+                logger.warning("No data to process")
+                return False
+                
+            logger.debug(f"Initial data shape: {self.cleaned_data.shape}")
+            
+            # Make a copy to avoid modifying the original
+            df = self.cleaned_data.copy()
+            
+            # Initial row count for skipped rows calculation
+            initial_count = len(df)
+            
+            # Basic checks for required columns
+            required_columns = [
+                'IPTC_DE Anweisung', 
+                'IPTC_EN Anweisung', 
+                'Bildankunft', 
+                'OnlineZeit'
+            ]
+            
+            for col in required_columns:
+                if col not in df.columns:
+                    logger.error(f"Required column '{col}' not found in data")
+                    return False
+            
+            # Track skipped rows for each file
+            for filename in self.loaded_files:
+                # Initialize skipped count if not already present
+                if filename not in self.skipped_rows:
+                    self.skipped_rows[filename] = 0
+            
+            # Combine date and time columns if needed
+            logger.debug("Combining date and time columns")
+            if all(col in df.columns for col in ['Bildankunft', 'OnlineZeit']):
+                try:
+                    df['Bildankunft'] = pd.to_datetime(df['Bildankunft'], errors='coerce')
+                    df['OnlineZeit'] = pd.to_datetime(df['OnlineZeit'], errors='coerce')
+                    
+                    # Check for NaT values after conversion
+                    bildankunft_nat = df['Bildankunft'].isna().sum()
+                    onlinezeit_nat = df['OnlineZeit'].isna().sum()
+                    if bildankunft_nat > 0 or onlinezeit_nat > 0:
+                        logger.warning(f"Found {bildankunft_nat} NaT values in Bildankunft and {onlinezeit_nat} in OnlineZeit after conversion")
+                except Exception as e:
+                    logger.error(f"Error converting datetime columns: {str(e)}", exc_info=True)
+                    return False
+            
+            # Calculate delay in minutes
+            logger.debug("Calculating delays")
+            df['Verzögerung_Minuten'] = (df['OnlineZeit'] - df['Bildankunft']).dt.total_seconds() / 60
+            
+            # Remove negative delays (likely errors in the data)
+            negative_delays = df['Verzögerung_Minuten'] < 0
+            negative_count = negative_delays.sum()
+            if negative_count > 0:
+                logger.info(f"Removing {negative_count} rows with negative delays")
+                df = df[~negative_delays]
+            
+            # Add additional columns for analysis
+            logger.debug("Adding additional columns for analysis")
+            df['Jahr'] = df['Bildankunft'].dt.year
+            df['Monat'] = df['Bildankunft'].dt.month
+            df['Tag'] = df['Bildankunft'].dt.day
+            df['Wochentag'] = df['Bildankunft'].dt.weekday  # 0 = Monday, 6 = Sunday
+            df['Stunde'] = df['Bildankunft'].dt.hour
+            df['Kalenderwoche'] = df['Bildankunft'].dt.isocalendar().week
+            
+            # Calculate skipped rows and update stats
+            skipped = initial_count - len(df)
+            logger.info(f"Skipped {skipped} rows during processing")
+            
+            # Update skipped rows proportionally across files
+            if skipped > 0 and len(self.loaded_files) > 0:
+                for filename in self.loaded_files:
+                    # Calculate proportion of this file to the total
+                    file_proportion = self.import_stats[filename]['total'] / initial_count
+                    estimated_skipped = round(skipped * file_proportion)
+                    self.skipped_rows[filename] += estimated_skipped
+                    self.import_stats[filename]['skipped'] = self.skipped_rows[filename]
+                    logger.debug(f"File {filename}: {estimated_skipped} rows skipped in this processing")
+            
+            # Store the cleaned data
+            self.cleaned_data = df
+            
+            logger.info(f"Data processing complete. Final shape: {df.shape}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error processing data: {str(e)}", exc_info=True)
+            messagebox.showerror("Processing Error", f"Error processing data: {str(e)}")
+            return False
+                
+    def _combine_date_time(self, row):
+        """
+        Combine date from activation timestamp with time from IPTC timestamp.
+        
+        Args:
+            row: DataFrame row with IPTC_Timestamp and Bild Aktivierungszeitpunkt.
+            
+        Returns:
+            datetime: Combined datetime object.
+        """
+        try:
+            if pd.isna(row['IPTC_Timestamp']) or pd.isna(row['Bild Aktivierungszeitpunkt']):
+                return pd.NaT
+                
+            # Get the base date from the activation timestamp
+            base_date = row['Bild Aktivierungszeitpunkt'].date()
+            
+            # Parse the IPTC timestamp
+            iptc_time = datetime.strptime(row['IPTC_Timestamp'], '%H:%M:%S').time()
+            
+            # Combine date and time
+            bildankunft = datetime.combine(base_date, iptc_time)
+            
+            # If the result is later than the activation timestamp, it's likely from the previous day
+            if bildankunft > row['Bild Aktivierungszeitpunkt']:
+                bildankunft = bildankunft - timedelta(days=1)
+                
+            return bildankunft
+        except:
+            return pd.NaT
+    
+    def create_pivot_table(self, max_delay=None, granularity="daily"):
+        """
+        Create a pivot table for visualization.
+        
+        Args:
+            max_delay (float): Maximum delay to include (None for no limit).
+            granularity (str): Time granularity ('daily', 'weekly', 'monthly', 'yearly').
+            
+        Returns:
+            pd.DataFrame: Pivot table for visualization.
+        """
+        if self.cleaned_data is None:
+            print("No data available. Please import a file first.")
+            return None
+        
+        # Make a copy of the data for filtering
+        data = self.cleaned_data.copy()
+        
+        # Apply max delay filter if specified
+        if max_delay is not None:
+            data = data[data['Verzögerung_Minuten'] <= max_delay]
+        
+        # Create pivot table based on granularity
+        if granularity == "daily":
+            # Pivot by day of month and hour
+            data['Day'] = data['Bildankunft'].dt.day
+            data['Hour'] = data['Bildankunft'].dt.hour
+            
+            pivot = pd.pivot_table(
+                data,
+                values='Verzögerung_Minuten',
+                index='Day',
+                columns='Hour',
+                aggfunc='mean',
+                fill_value=0
+            )
+            
+        elif granularity == "weekly":
+            try:
+                # Pivot by day of week and hour
+                try:
+                    # Try with different pandas versions
+                    try:
+                        # Using day_name() method for newer pandas
+                        data['Weekday'] = data['Bildankunft'].dt.day_name().str[:3]
+                    except:
+                        # For older pandas versions
+                        data['Weekday'] = data['Bildankunft'].dt.strftime('%a')
+                except:
+                    # Last resort fallback
+                    data['Weekday'] = data['Bildankunft'].dt.weekday
+                    weekday_map = {0: 'Mon', 1: 'Tue', 2: 'Wed', 3: 'Thu', 4: 'Fri', 5: 'Sat', 6: 'Sun'}
+                    data['Weekday'] = data['Weekday'].map(weekday_map)
+                
+                data['Hour'] = data['Bildankunft'].dt.hour
+                
+                # Define weekday order
+                weekday_order = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+                
+                # Create pivot table
+                pivot = pd.pivot_table(
+                    data,
+                    values='Verzögerung_Minuten',
+                    index='Weekday',
+                    columns='Hour',
+                    aggfunc='mean',
+                    fill_value=0
+                )
+                
+                # Reorder the weekdays if they're in the right format
+                try:
+                    pivot = pivot.reindex(weekday_order)
+                except:
+                    # If reindexing fails, just use the pivot as is
+                    pass
+            
+            except Exception as e:
+                print(f"Error creating weekly pivot table: {str(e)}")
+                # Fallback to a simpler weekly view
+                try:
+                    data['Day'] = data['Bildankunft'].dt.day
+                    data['Hour'] = data['Bildankunft'].dt.hour
+                    
+                    pivot = pd.pivot_table(
+                        data,
+                        values='Verzögerung_Minuten',
+                        index='Day',
+                        columns='Hour',
+                        aggfunc='mean',
+                        fill_value=0
+                    )
+                except Exception as e2:
+                    print(f"Failed to create fallback pivot: {str(e2)}")
+                    return None
+            
+        elif granularity == "monthly":
+            # Pivot by month and hour
+            data['Month'] = data['Bildankunft'].dt.month
+            data['Hour'] = data['Bildankunft'].dt.hour
+            
+            pivot = pd.pivot_table(
+                data,
+                values='Verzögerung_Minuten',
+                index='Month',
+                columns='Hour',
+                aggfunc='mean',
+                fill_value=0
+            )
+            
+            # Map month numbers to month names
+            month_names = {
+                1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
+                7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'
+            }
+            pivot.index = [month_names.get(m, m) for m in pivot.index]
+            
+        elif granularity == "yearly":
+            # Pivot by year and month
+            data['Year'] = data['Bildankunft'].dt.year
+            data['Month'] = data['Bildankunft'].dt.month
+            
+            pivot = pd.pivot_table(
+                data,
+                values='Verzögerung_Minuten',
+                index='Year',
+                columns='Month',
+                aggfunc='mean',
+                fill_value=0
+            )
+            
+            # Map month numbers to month names
+            month_names = {
+                1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
+                7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'
+            }
+            pivot.columns = [month_names.get(m, m) for m in pivot.columns]
+            
+        else:  # "hourly" (combined view)
+            # Pivot by hour only, combining all dates
+            data['Hour'] = data['Bildankunft'].dt.hour
+            
+            # Use a dummy index to get a 1-row heatmap
+            data['All Data'] = 'All Data'
+            
+            pivot = pd.pivot_table(
+                data,
+                values='Verzögerung_Minuten',
+                index='All Data',
+                columns='Hour',
+                aggfunc='mean',
+                fill_value=0
+            )
+        
+        self.pivot_table = pivot
+        return pivot
+    
+    def create_heatmap(self, cmap='YlOrRd', figsize=(10, 6)):
+        """
+        Create a heatmap visualization of the pivot table.
+        
+        Args:
+            cmap: Colormap for the heatmap
+            figsize: Figure size tuple (width, height)
+            
+        Returns:
+            Figure: Matplotlib figure object
+        """
+        if self.pivot_table is None:
+            print("No pivot table available. Please run create_pivot_table first.")
+            return None
+        
+        try:
+            # Use non-interactive backend to avoid main thread issues
+            import matplotlib
+            default_backend = matplotlib.get_backend()
+            matplotlib.use('Agg')
+            
+            # Close any existing figures to prevent thread issues
+            plt.close('all')
+            
+            # Create new figure
+            fig, ax = plt.subplots(figsize=figsize)
+            
+            # Create heatmap
+            sns.heatmap(
+                self.pivot_table,
+                cmap=cmap,
+                annot=True,
+                fmt=".1f",
+                linewidths=.5,
+                ax=ax,
+                cbar_kws={'label': 'Average Delay (minutes)'}
+            )
+            
+            # Adjust layout
+            plt.tight_layout()
+            
+            # Switch back to the original backend
+            matplotlib.use(default_backend)
+            
+            return fig
+        except Exception as e:
+            print(f"Error creating heatmap: {str(e)}")
+            return None
+    
+    def get_loaded_files_summary(self):
+        """
+        Get a summary of loaded files.
+        
+        Returns:
+            str: Summary of loaded files
+        """
+        if not self.loaded_files:
+            return "No files loaded"
+            
+        file_names = [os.path.basename(f) for f in self.loaded_files]
+        return f"{len(file_names)} file(s): " + ", ".join(file_names)
+    
+    def get_statistics(self):
+        """
+        Calculate basic statistics of the cleaned data.
+        
+        Returns:
+            dict: Statistics dictionary
+        """
+        if self.cleaned_data is None or 'Verzögerung_Minuten' not in self.cleaned_data.columns:
+            return {
+                'total_records': 0,
+                'avg_delay': 0,
+                'min_delay': 0,
+                'max_delay': 0
+            }
+            
+        stats = {
+            'total_records': len(self.cleaned_data),
+            'avg_delay': self.cleaned_data['Verzögerung_Minuten'].mean(),
+            'min_delay': self.cleaned_data['Verzögerung_Minuten'].min(),
+            'max_delay': self.cleaned_data['Verzögerung_Minuten'].max()
+        }
+        
+        # Get available months and years
+        if 'Monat' in self.cleaned_data.columns and 'Jahr' in self.cleaned_data.columns:
+            # Get unique month-year combinations
+            month_year_df = self.cleaned_data[['Monat', 'Jahr']].drop_duplicates()
+            
+            # Convert month numbers to names
+            month_names = {
+                1: 'January', 2: 'February', 3: 'March', 4: 'April',
+                5: 'May', 6: 'June', 7: 'July', 8: 'August',
+                9: 'September', 10: 'October', 11: 'November', 12: 'December'
+            }
+            
+            # Create list of available month-year combinations
+            available_months = []
+            for _, row in month_year_df.iterrows():
+                month_name = month_names.get(row['Monat'], str(row['Monat']))
+                available_months.append((row['Monat'], row['Jahr'], f"{month_name} {row['Jahr']}"))
+            
+            stats['available_months'] = sorted(available_months)
+            stats['available_years'] = sorted(self.cleaned_data['Jahr'].unique().tolist())
+        
+        return stats
+    
+    def save_heatmap(self, fig, output_path):
+        """
+        Save the heatmap figure to a file.
+        
+        Args:
+            fig: Matplotlib figure to save
+            output_path: Path to save the figure
+            
+        Returns:
+            bool: Success status
+        """
+        try:
+            fig.savefig(output_path, bbox_inches='tight', dpi=300)
+            return True
+        except Exception as e:
+            print(f"Error saving heatmap: {str(e)}")
+            return False
+    
+    def export_data(self, output_path):
+        """
+        Export the cleaned data to a CSV or Excel file.
+        
+        Args:
+            output_path: Path to save the data
+            
+        Returns:
+            bool: Success status
+        """
+        try:
+            if self.cleaned_data is None:
+                return False
+                
+            if output_path.lower().endswith('.csv'):
+                self.cleaned_data.to_csv(output_path, index=False)
+            else:
+                self.cleaned_data.to_excel(output_path, index=False)
+                
+            return True
+        except Exception as e:
+            print(f"Error exporting data: {str(e)}")
+            return False
+
+class SimpleAnalysisGUI:
+    """A simplified GUI for the analysis tool."""
+
+    def __init__(self, root):
+        """Initialize the GUI with the given root window."""
+        logger.info("Initializing SimpleAnalysisGUI")
+        self.root = root
+        self.root.title("Image Deployment Analysis Tool")
+        self.root.geometry("1200x800")
+        self.root.minsize(800, 600)
+
+        # Create an analyzer
+        self.analyzer = DeploymentAnalyzer()
+        
+        # Set up threading variables
+        self.running_threads = []
+        self.is_running = True
+        self.current_figure = None
+        self.current_pivot_table = None
+        self.current_granularity = None
+        
+        # Set up selection tracking
+        self.selected_year = None
+        self.selected_month = None
+        self.selected_week = None
+        self.selected_granularity = tk.StringVar(value="combined")
+        
+        # Set up frames
+        self.create_main_frames()
+        
+        # Create widgets
+        self._create_widgets()
+        
+        # Set up layout
+        self._setup_layout()
+        
+        # Set up window close handler
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        
+        logger.info("SimpleAnalysisGUI initialization complete")
+
+    def on_closing(self):
+        """Handle window closing event."""
+        logger.info("Application closing")
+        
+        # Set the flag to indicate the app is closing
+        self.is_running = False
+        
+        # Wait for all threads to complete
+        for thread in self.running_threads:
+            if thread.is_alive():
+                logger.debug(f"Waiting for thread {thread.name} to complete")
+                self.root.after(100)  # Give some time for threads to notice is_running = False
+        
+        # Destroy the window
+        self.root.destroy()
+        
+        logger.info("Application closed")
+
+    def create_main_frames(self):
+        """Create the main application frames."""
+        logger.debug("Creating main frames")
+        # Configure grid
+        self.root.grid_columnconfigure(0, weight=1)  # Navigation column
+        self.root.grid_rowconfigure(0, weight=1)  # Main row
+        
+        # Main application frame
+        self.main_frame = ttk.Frame(self.root)
+        self.main_frame.grid(row=0, column=0, sticky="nsew")
+        
+        # Configure main frame grid
+        self.main_frame.grid_columnconfigure(0, weight=0)  # Navigation column
+        self.main_frame.grid_columnconfigure(1, weight=1)  # Main content column
+        self.main_frame.grid_rowconfigure(0, weight=1)  # Main row
+        
+        # Create frames
+        self.navigation_frame = ttk.Frame(self.main_frame, width=200, padding=10)
+        self.navigation_frame.grid(row=0, column=0, sticky="ns")
+        
+        self.content_frame = ttk.Frame(self.main_frame, padding=10)
+        self.content_frame.grid(row=0, column=1, sticky="nsew")
+        
+        # Configure content frame grid
+        self.content_frame.grid_columnconfigure(0, weight=1)  # Main column
+        self.content_frame.grid_rowconfigure(0, weight=0)  # Stats row
+        self.content_frame.grid_rowconfigure(1, weight=1)  # Visualization row
+        
+        # Create statistics and visualization frames
+        self.stats_frame = ttk.LabelFrame(self.content_frame, text="Statistics", padding=10)
+        self.stats_frame.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+        
+    def _update_stats_from_dict(self, stats):
+        """Update the statistics labels from a dictionary."""
+        logger.debug(f"Updating stats from dict: {stats}")
+        try:
+            # Update basic statistics
+            self.total_records_label.config(text=f"{stats.get('total_records', 0):,}")
+            self.avg_delay_label.config(text=f"{stats.get('avg_delay', 0):.2f} minutes")
+            self.min_delay_label.config(text=f"{stats.get('min_delay', 0):.2f} minutes")
+            self.max_delay_label.config(text=f"{stats.get('max_delay', 0):.2f} minutes")
+            
+            # Also update file statistics
+            self._update_file_statistics()
+        except Exception as e:
+            logger.error(f"Error updating stats from dict: {str(e)}", exc_info=True)
+        

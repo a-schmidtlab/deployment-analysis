@@ -54,7 +54,7 @@ class Dashboard:
         )
         
         # Set the app title
-        self.app.title = "Image Distribution Analysis Dashboard"
+        self.app.title = "Image Distribution Analysis"
         
         # Load available dates from database if connected
         if self.db_connection:
@@ -77,195 +77,166 @@ class Dashboard:
             return
             
         # Create date range options
-        date_ranges = []
-        if self.available_dates:
-            min_date = min(self.available_dates)
-            max_date = max(self.available_dates)
-            date_ranges = [
-                {"label": "All Data", "value": "all"},
-                {"label": "Last 7 Days", "value": "last_7_days"},
-                {"label": "Last 30 Days", "value": "last_30_days"},
-                {"label": "Custom Range", "value": "custom"}
-            ]
-        
-        # Create granularity options
-        granularity_options = [
-            {"label": "Minute", "value": "minute"},
-            {"label": "Hour", "value": "hour"},
-            {"label": "Day", "value": "day"},
-            {"label": "Week", "value": "week"},
-            {"label": "Month", "value": "month"},
-            {"label": "Year", "value": "year"}
+        date_ranges = [
+            {"label": "Last 7 Days", "value": "last_7_days"},
+            {"label": "Last 30 Days", "value": "last_30_days"},
+            {"label": "All Data", "value": "all"}
         ]
         
-        # Create metric options
-        metric_options = [
-            {"label": "Mean", "value": "mean"},
-            {"label": "Median", "value": "median"},
-            {"label": "Count", "value": "count"},
-            {"label": "Min", "value": "min"},
-            {"label": "Max", "value": "max"}
-        ]
-        
-        # Create anomaly detection method options
-        anomaly_method_options = [
-            {"label": "Z-Score", "value": "zscore"},
-            {"label": "IQR", "value": "iqr"},
-            {"label": "Percentile", "value": "percentile"},
-            {"label": "Absolute Threshold", "value": "absolute"}
-        ]
-        
-        # Create the layout
+        # Create the layout - simplified version
         self.app.layout = dbc.Container([
             # Header
             dbc.Row([
-                dbc.Col(html.H1("Image Distribution Analysis Dashboard", className="text-center my-4"), width=12)
+                dbc.Col(html.H2("Image Distribution Analysis", className="text-center my-3"), width=12)
             ]),
             
-            # Control Panel
+            # Time Range Selection - Simplified
+            dbc.Row([
+                dbc.Col([
+                    html.Label("Time Range:"),
+                    dcc.Dropdown(
+                        id="date-range-dropdown",
+                        options=date_ranges,
+                        value="last_7_days" if self.available_dates else None,
+                        className="mb-3"
+                    )
+                ], width={"size": 4, "offset": 4})
+            ]),
+            
+            # Statistics Cards Row
             dbc.Row([
                 dbc.Col([
                     dbc.Card([
-                        dbc.CardHeader("Control Panel"),
                         dbc.CardBody([
-                            # Data Range Selection
-                            html.H5("Data Range"),
-                            dbc.Row([
-                                dbc.Col([
-                                    dcc.Dropdown(
-                                        id="date-range-dropdown",
-                                        options=date_ranges,
-                                        value="all" if self.available_dates else None,
-                                        placeholder="Select date range"
-                                    )
-                                ], width=4),
-                                dbc.Col([
-                                    dcc.DatePickerRange(
-                                        id="date-picker-range",
-                                        min_date_allowed=min(self.available_dates) if self.available_dates else None,
-                                        max_date_allowed=max(self.available_dates) if self.available_dates else None,
-                                        start_date=min(self.available_dates) if self.available_dates else None,
-                                        end_date=max(self.available_dates) if self.available_dates else None,
-                                        display_format="YYYY-MM-DD",
-                                        disabled=True
-                                    )
-                                ], width=8)
-                            ]),
-                            
-                            html.Hr(),
-                            
-                            # Analysis Settings
-                            html.H5("Analysis Settings"),
-                            dbc.Row([
-                                dbc.Col([
-                                    html.Label("Time Granularity"),
-                                    dcc.Dropdown(
-                                        id="granularity-dropdown",
-                                        options=granularity_options,
-                                        value="hour",
-                                        placeholder="Select granularity"
-                                    )
-                                ], width=4),
-                                dbc.Col([
-                                    html.Label("Metric"),
-                                    dcc.Dropdown(
-                                        id="metric-dropdown",
-                                        options=metric_options,
-                                        value="mean",
-                                        placeholder="Select metric"
-                                    )
-                                ], width=4),
-                                dbc.Col([
-                                    html.Label("Update Analysis"),
-                                    html.Br(),
-                                    dbc.Button("Run Analysis", id="run-analysis-button", color="primary", className="mt-1")
-                                ], width=4)
-                            ]),
-                            
-                            html.Hr(),
-                            
-                            # Anomaly Detection Settings
-                            html.H5("Anomaly Detection"),
-                            dbc.Row([
-                                dbc.Col([
-                                    html.Label("Method"),
-                                    dcc.Dropdown(
-                                        id="anomaly-method-dropdown",
-                                        options=anomaly_method_options,
-                                        value="zscore",
-                                        placeholder="Select method"
-                                    )
-                                ], width=4),
-                                dbc.Col([
-                                    html.Label("Threshold"),
-                                    dcc.Slider(
-                                        id="anomaly-threshold-slider",
-                                        min=1,
-                                        max=5,
-                                        step=0.5,
-                                        value=3,
-                                        marks={i: str(i) for i in range(1, 6)}
-                                    )
-                                ], width=4),
-                                dbc.Col([
-                                    html.Label("Detect Anomalies"),
-                                    html.Br(),
-                                    dbc.Button("Run Detection", id="run-anomaly-button", color="danger", className="mt-1")
-                                ], width=4)
+                            html.H5("Total Records", className="card-title text-center"),
+                            html.H3(id="stat-total-records", className="text-center text-primary")
+                        ])
+                    ])
+                ], width=3),
+                
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.H5("Average Delay", className="card-title text-center"),
+                            html.H3(id="stat-avg-delay", className="text-center text-primary")
+                        ])
+                    ])
+                ], width=3),
+                
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.H5("Min Delay", className="card-title text-center"),
+                            html.H3(id="stat-min-delay", className="text-center text-success")
+                        ])
+                    ])
+                ], width=3),
+                
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.H5("Max Delay", className="card-title text-center"),
+                            html.H3(id="stat-max-delay", className="text-center text-danger")
+                        ])
+                    ])
+                ], width=3)
+            ], className="mb-4"),
+            
+            # Heatmap - Main Focus
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader("Processing Delays by Weekday and Hour"),
+                        dbc.CardBody([
+                            dcc.Loading(
+                                id="loading-heatmap",
+                                type="circle",
+                                children=dcc.Graph(id="heatmap-graph")
+                            )
+                        ])
+                    ])
+                ], width=12)
+            ], className="mb-4"),
+            
+            # Expandable Analysis Section
+            dbc.Row([
+                dbc.Col([
+                    dbc.Button(
+                        "Advanced Analysis ▼",
+                        id="toggle-advanced-button",
+                        color="secondary",
+                        className="mb-3 w-100"
+                    ),
+                    dbc.Collapse(
+                        dbc.Card([
+                            dbc.CardBody([
+                                # Analysis Controls
+                                dbc.Row([
+                                    dbc.Col([
+                                        html.Label("Time Granularity:"),
+                                        dcc.Dropdown(
+                                            id="granularity-dropdown",
+                                            options=[
+                                                {"label": "Hour", "value": "hour"},
+                                                {"label": "Day", "value": "day"},
+                                                {"label": "Week", "value": "week"}
+                                            ],
+                                            value="hour"
+                                        )
+                                    ], width=4),
+                                    
+                                    dbc.Col([
+                                        html.Label("Metric:"),
+                                        dcc.Dropdown(
+                                            id="metric-dropdown",
+                                            options=[
+                                                {"label": "Mean", "value": "mean"},
+                                                {"label": "Median", "value": "median"},
+                                                {"label": "Count", "value": "count"}
+                                            ],
+                                            value="mean"
+                                        )
+                                    ], width=4),
+                                    
+                                    dbc.Col([
+                                        html.Label("Detect Anomalies:"),
+                                        dbc.Switch(
+                                            id='anomaly-switch',
+                                            label=' Show anomalies',
+                                            value=False,
+                                            className="mt-2"
+                                        )
+                                    ], width=4)
+                                ], className="mb-3"),
+                                
+                                # Timeline Graph
+                                dcc.Loading(
+                                    id="loading-timeline",
+                                    type="circle",
+                                    children=dcc.Graph(id="timeline-graph")
+                                ),
+                                
+                                # Export Buttons
+                                dbc.Row([
+                                    dbc.Col([
+                                        dbc.Button("Export as PNG", id="btn-export-png", color="primary", className="me-2"),
+                                        dbc.Button("Export as CSV", id="btn-export-csv", color="primary")
+                                    ], width=12, className="d-flex justify-content-end mt-3")
+                                ]),
+                                
+                                # Hidden div for storing anomaly data
+                                html.Div(id="anomaly-data-storage", style={"display": "none"})
                             ])
-                        ])
-                    ])
+                        ]),
+                        id="collapse-advanced",
+                        is_open=False
+                    )
                 ], width=12)
             ]),
-            
-            html.Hr(),
-            
-            # Timeline Analysis Tab
-            dbc.Row([
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardHeader("Timeline Analysis"),
-                        dbc.CardBody([
-                            dcc.Graph(id="timeline-graph")
-                        ])
-                    ])
-                ], width=12)
-            ]),
-            
-            html.Hr(),
-            
-            # Weekday-Hour Heatmap
-            dbc.Row([
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardHeader("Weekday-Hour Heatmap"),
-                        dbc.CardBody([
-                            dcc.Graph(id="heatmap-graph")
-                        ])
-                    ])
-                ], width=12)
-            ]),
-            
-            html.Hr(),
-            
-            # Anomaly Detection
-            dbc.Row([
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardHeader("Anomaly Detection"),
-                        dbc.CardBody([
-                            dcc.Graph(id="anomaly-graph"),
-                            html.Div(id="anomaly-summary")
-                        ])
-                    ])
-                ], width=12)
-            ]),
-            
-            html.Hr(),
             
             # Footer
             dbc.Row([
-                dbc.Col(html.P("Image Distribution Analysis Tool - © 2025", className="text-center"), width=12)
+                dbc.Col(html.P("© 2025 Image Distribution Analysis Tool", className="text-center text-muted mt-3"), width=12)
             ])
             
         ], fluid=True)
@@ -276,85 +247,118 @@ class Dashboard:
             logger.error("App not initialized")
             return
         
-        # Enable/disable date picker based on date range selection
+        # Toggle advanced analysis section
         @self.app.callback(
-            [Output("date-picker-range", "disabled"),
-             Output("date-picker-range", "start_date"),
-             Output("date-picker-range", "end_date")],
+            [Output("collapse-advanced", "is_open"),
+             Output("toggle-advanced-button", "children")],
+            [Input("toggle-advanced-button", "n_clicks")],
+            [State("collapse-advanced", "is_open")]
+        )
+        def toggle_advanced_section(n_clicks, is_open):
+            if n_clicks:
+                return not is_open, "Advanced Analysis ▼" if not is_open else "Advanced Analysis ▲"
+            return is_open, "Advanced Analysis ▼"
+        
+        # Update statistics and heatmap
+        @self.app.callback(
+            [Output("stat-total-records", "children"),
+             Output("stat-avg-delay", "children"),
+             Output("stat-min-delay", "children"),
+             Output("stat-max-delay", "children"),
+             Output("heatmap-graph", "figure"),
+             Output("anomaly-data-storage", "children")],
             [Input("date-range-dropdown", "value")]
         )
-        def update_date_picker(date_range):
-            # If no date range is selected, disable the date picker
+        def update_main_view(date_range):
             if not date_range:
-                return True, None, None
+                return "N/A", "N/A", "N/A", "N/A", go.Figure(), ""
                 
-            # Enable the date picker for custom range
-            if date_range == "custom":
-                return False, min(self.available_dates) if self.available_dates else None, max(self.available_dates) if self.available_dates else None
+            # Handle date range selection
+            date_range_tuple = self._get_date_range(date_range)
                 
-            # Disable the date picker for predefined ranges and set the dates
-            if date_range == "all":
-                return True, min(self.available_dates) if self.available_dates else None, max(self.available_dates) if self.available_dates else None
+            # Load data
+            if not self.timeline_analyzer:
+                return "N/A", "N/A", "N/A", "N/A", go.Figure(), ""
                 
-            if date_range == "last_7_days":
-                end_date = max(self.available_dates) if self.available_dates else None
-                if end_date:
-                    start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=7)).strftime('%Y-%m-%d')
-                    return True, start_date, end_date
+            self.timeline_analyzer.load_data(date_range=date_range_tuple)
+            
+            # Create a copy to calculate statistics
+            data = self.timeline_analyzer.data.copy()
+            
+            # Get basic statistics
+            total_records = len(data)
+            avg_delay = data['processing_delay_minutes'].mean()
+            min_delay = data['processing_delay_minutes'].min()
+            max_delay = data['processing_delay_minutes'].max()
+            
+            # Format statistics for display
+            total_formatted = f"{total_records:,}"
+            avg_formatted = f"{avg_delay:.1f} min"
+            min_formatted = f"{min_delay:.1f} min"
+            max_formatted = f"{max_delay:.1f} min"
+            
+            # Get weekday-hour heatmap
+            pivot_table = self.timeline_analyzer.analyze_weekday_hour_pattern()
+            
+            if pivot_table is None:
+                heatmap_fig = go.Figure()
+            else:
+                # Sort weekdays in correct order
+                weekday_order = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
+                pivot_table = pivot_table.reindex(weekday_order)
                 
-            if date_range == "last_30_days":
-                end_date = max(self.available_dates) if self.available_dates else None
-                if end_date:
-                    start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
-                    return True, start_date, end_date
+                # Create heatmap figure
+                heatmap_fig = px.imshow(
+                    pivot_table,
+                    labels=dict(x="Hour of Day", y="Weekday", color="Average Delay (minutes)"),
+                    x=pivot_table.columns,
+                    y=pivot_table.index,
+                    color_continuous_scale="YlOrRd",
+                    title=None
+                )
                 
-            return True, None, None
+                # Add text annotations
+                annotations = []
+                for i, row in enumerate(pivot_table.index):
+                    for j, col in enumerate(pivot_table.columns):
+                        annotations.append(
+                            dict(
+                                x=col,
+                                y=row,
+                                text=str(int(pivot_table.loc[row, col])),
+                                showarrow=False,
+                                font=dict(color="black" if pivot_table.loc[row, col] < 30 else "white")
+                            )
+                        )
+                
+                heatmap_fig.update_layout(annotations=annotations)
+                heatmap_fig.update_layout(
+                    height=500,
+                    margin=dict(l=50, r=50, t=30, b=50)
+                )
+            
+            # Store data for anomaly detection (for use in advanced section)
+            anomaly_data = data.to_json(date_format='iso', orient='split') if not data.empty else ""
+            
+            return total_formatted, avg_formatted, min_formatted, max_formatted, heatmap_fig, anomaly_data
         
-        # Update timeline graph based on settings
+        # Update timeline chart in advanced section
         @self.app.callback(
             Output("timeline-graph", "figure"),
-            [Input("run-analysis-button", "n_clicks")],
-            [State("date-range-dropdown", "value"),
-             State("date-picker-range", "start_date"),
-             State("date-picker-range", "end_date"),
-             State("granularity-dropdown", "value"),
-             State("metric-dropdown", "value")]
+            [Input("granularity-dropdown", "value"),
+             Input("metric-dropdown", "value"),
+             Input("anomaly-switch", "value"),
+             Input("anomaly-data-storage", "children")]
         )
-        def update_timeline_graph(n_clicks, date_range, start_date, end_date, granularity, metric):
-            # Skip if not triggered or no settings
-            if n_clicks is None or not granularity or not metric:
+        def update_timeline(granularity, metric, show_anomalies, stored_data):
+            if not granularity or not metric or not stored_data:
                 return go.Figure()
                 
-            # Load data if needed
             if self.timeline_analyzer:
-                # Set date range
-                if date_range and date_range != "custom":
-                    if date_range == "all":
-                        date_range_tuple = None
-                    elif date_range == "last_7_days":
-                        end_date = max(self.available_dates) if self.available_dates else None
-                        if end_date:
-                            start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=7)).strftime('%Y-%m-%d')
-                            date_range_tuple = (start_date, end_date)
-                        else:
-                            date_range_tuple = None
-                    elif date_range == "last_30_days":
-                        end_date = max(self.available_dates) if self.available_dates else None
-                        if end_date:
-                            start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
-                            date_range_tuple = (start_date, end_date)
-                        else:
-                            date_range_tuple = None
-                else:
-                    # Custom date range
-                    if start_date and end_date:
-                        date_range_tuple = (start_date, end_date)
-                    else:
-                        date_range_tuple = None
-                
-                # Load data and run analysis
-                self.timeline_analyzer.load_data(date_range=date_range_tuple)
+                # Set time granularity
                 self.timeline_analyzer.set_time_granularity(granularity)
+                
+                # Analyze time patterns
                 time_patterns = self.timeline_analyzer.analyze_time_pattern()
                 
                 if time_patterns is not None:
@@ -367,15 +371,69 @@ class Dashboard:
                         title=f"{metric.capitalize()} Processing Delay by {granularity.capitalize()}",
                         labels={
                             "time_group": granularity.capitalize(),
-                            column_name: f"{metric.capitalize()} Processing Delay (minutes)"
+                            column_name: f"{metric.capitalize()} Delay (minutes)"
                         }
                     )
+                    
+                    # Add anomalies if requested
+                    if show_anomalies and self.anomaly_detector and stored_data:
+                        # Load the data used for the main view
+                        data = pd.read_json(stored_data, orient='split')
+                        self.anomaly_detector.load_data(data=data)
+                        
+                        # Set Z-score method with standard threshold
+                        self.anomaly_detector.set_threshold_method('zscore', value=3.0)
+                        
+                        # Detect anomalies
+                        anomalies = self.anomaly_detector.detect_anomalies()
+                        
+                        if anomalies is not None and not anomalies.empty:
+                            # Convert to time buckets matching the timeline graph
+                            if granularity == 'hour':
+                                anomalies['time_bucket'] = anomalies['bildankunft_timestamp'].dt.floor('H')
+                            elif granularity == 'day':
+                                anomalies['time_bucket'] = anomalies['bildankunft_timestamp'].dt.floor('D')
+                            elif granularity == 'week':
+                                anomalies['time_bucket'] = anomalies['bildankunft_timestamp'].dt.to_period('W').dt.start_time
+                            
+                            # Group anomalies by time bucket
+                            anomaly_counts = anomalies.groupby('time_bucket').size().reset_index(name='count')
+                            
+                            # Add scatter points for anomaly counts
+                            if not anomaly_counts.empty:
+                                # For each time point in the main graph, find matching anomaly counts
+                                merged = pd.merge(
+                                    time_patterns[['time_group']],
+                                    anomaly_counts,
+                                    left_on='time_group',
+                                    right_on='time_bucket',
+                                    how='left'
+                                ).fillna(0)
+                                
+                                # Add scatter trace for anomalies
+                                fig.add_trace(
+                                    go.Scatter(
+                                        x=merged['time_group'],
+                                        y=[time_patterns[column_name].max() * 0.2] * len(merged),  # Plot at 20% of max height
+                                        mode='markers',
+                                        marker=dict(
+                                            size=merged['count'] * 2,  # Size based on anomaly count
+                                            color='red',
+                                            symbol='x'
+                                        ),
+                                        name='Anomalies',
+                                        hovertemplate='%{x}<br>Anomalies: %{text}<extra></extra>',
+                                        text=merged['count'].astype(int)
+                                    )
+                                )
                     
                     # Customize the figure
                     fig.update_layout(
                         xaxis_title=granularity.capitalize(),
-                        yaxis_title=f"{metric.capitalize()} Processing Delay (minutes)",
-                        template="plotly_white"
+                        yaxis_title=f"{metric.capitalize()} Delay (minutes)",
+                        template="plotly_white",
+                        height=400,
+                        margin=dict(l=50, r=50, t=50, b=50)
                     )
                     
                     return fig
@@ -383,199 +441,48 @@ class Dashboard:
             # Return empty figure if analysis fails
             return go.Figure()
         
-        # Update heatmap graph based on settings
+        # Export buttons - placeholder callbacks
         @self.app.callback(
-            Output("heatmap-graph", "figure"),
-            [Input("run-analysis-button", "n_clicks")],
-            [State("date-range-dropdown", "value"),
-             State("date-picker-range", "start_date"),
-             State("date-picker-range", "end_date")]
+            Output("btn-export-png", "n_clicks"),
+            [Input("btn-export-png", "n_clicks")]
         )
-        def update_heatmap_graph(n_clicks, date_range, start_date, end_date):
-            # Skip if not triggered
-            if n_clicks is None:
-                return go.Figure()
-                
-            # Load data if needed
-            if self.timeline_analyzer:
-                # Set date range
-                if date_range and date_range != "custom":
-                    if date_range == "all":
-                        date_range_tuple = None
-                    elif date_range == "last_7_days":
-                        end_date = max(self.available_dates) if self.available_dates else None
-                        if end_date:
-                            start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=7)).strftime('%Y-%m-%d')
-                            date_range_tuple = (start_date, end_date)
-                        else:
-                            date_range_tuple = None
-                    elif date_range == "last_30_days":
-                        end_date = max(self.available_dates) if self.available_dates else None
-                        if end_date:
-                            start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
-                            date_range_tuple = (start_date, end_date)
-                        else:
-                            date_range_tuple = None
-                else:
-                    # Custom date range
-                    if start_date and end_date:
-                        date_range_tuple = (start_date, end_date)
-                    else:
-                        date_range_tuple = None
-                
-                # Load data and run analysis
-                self.timeline_analyzer.load_data(date_range=date_range_tuple)
-                pivot_table = self.timeline_analyzer.analyze_weekday_hour_pattern()
-                
-                if pivot_table is not None:
-                    # Sort weekdays in correct order
-                    weekday_order = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
-                    pivot_table = pivot_table.reindex(weekday_order)
-                    
-                    # Create heatmap figure
-                    fig = px.imshow(
-                        pivot_table,
-                        labels=dict(x="Hour of Day", y="Weekday", color="Average Processing Delay (minutes)"),
-                        x=pivot_table.columns,
-                        y=pivot_table.index,
-                        color_continuous_scale="YlOrRd",
-                        title="Average Processing Delays by Weekday and Hour"
-                    )
-                    
-                    # Add text annotations
-                    annotations = []
-                    for i, row in enumerate(pivot_table.index):
-                        for j, col in enumerate(pivot_table.columns):
-                            annotations.append(
-                                dict(
-                                    x=col,
-                                    y=row,
-                                    text=str(int(pivot_table.loc[row, col])),
-                                    showarrow=False,
-                                    font=dict(color="black" if pivot_table.loc[row, col] < 30 else "white")
-                                )
-                            )
-                    
-                    fig.update_layout(annotations=annotations)
-                    
-                    return fig
-            
-            # Return empty figure if analysis fails
-            return go.Figure()
+        def export_png(n_clicks):
+            if n_clicks:
+                # Implement PNG export functionality here
+                pass
+            return None
         
-        # Update anomaly graph based on settings
         @self.app.callback(
-            [Output("anomaly-graph", "figure"),
-             Output("anomaly-summary", "children")],
-            [Input("run-anomaly-button", "n_clicks")],
-            [State("date-range-dropdown", "value"),
-             State("date-picker-range", "start_date"),
-             State("date-picker-range", "end_date"),
-             State("anomaly-method-dropdown", "value"),
-             State("anomaly-threshold-slider", "value")]
+            Output("btn-export-csv", "n_clicks"),
+            [Input("btn-export-csv", "n_clicks")]
         )
-        def update_anomaly_graph(n_clicks, date_range, start_date, end_date, method, threshold):
-            # Skip if not triggered
-            if n_clicks is None:
-                return go.Figure(), ""
-                
-            # Load data if needed
-            if self.anomaly_detector:
-                # Set date range
-                if date_range and date_range != "custom":
-                    if date_range == "all":
-                        date_range_tuple = None
-                    elif date_range == "last_7_days":
-                        end_date = max(self.available_dates) if self.available_dates else None
-                        if end_date:
-                            start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=7)).strftime('%Y-%m-%d')
-                            date_range_tuple = (start_date, end_date)
-                        else:
-                            date_range_tuple = None
-                    elif date_range == "last_30_days":
-                        end_date = max(self.available_dates) if self.available_dates else None
-                        if end_date:
-                            start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
-                            date_range_tuple = (start_date, end_date)
-                        else:
-                            date_range_tuple = None
-                else:
-                    # Custom date range
-                    if start_date and end_date:
-                        date_range_tuple = (start_date, end_date)
-                    else:
-                        date_range_tuple = None
-                
-                # Load data and detect anomalies
-                self.anomaly_detector.load_data(date_range=date_range_tuple)
-                self.anomaly_detector.set_threshold_method(method, value=threshold)
-                anomalies = self.anomaly_detector.detect_anomalies()
-                
-                if anomalies is not None:
-                    # Get summary
-                    summary = self.anomaly_detector.get_summary()
-                    
-                    # Create summary HTML
-                    summary_html = html.Div([
-                        html.H5("Anomaly Detection Summary"),
-                        html.P([
-                            f"Total anomalies: {summary['count']} ({summary['percentage']:.2f}% of data)",
-                            html.Br(),
-                            f"Average anomaly score: {summary['avg_score']:.2f}",
-                            html.Br(),
-                            f"Min delay: {summary['min_delay']:.2f} minutes",
-                            html.Br(),
-                            f"Max delay: {summary['max_delay']:.2f} minutes",
-                            html.Br(),
-                            f"Average delay: {summary['avg_delay']:.2f} minutes"
-                        ])
-                    ])
-                    
-                    # Get all data (including normal points)
-                    all_data = self.anomaly_detector.data
-                    
-                    # Create anomaly figure
-                    fig = go.Figure()
-                    
-                    # Add normal data
-                    normal_data = all_data[~all_data['is_anomaly']]
-                    fig.add_trace(go.Scatter(
-                        x=normal_data['bildankunft_timestamp'],
-                        y=normal_data['processing_delay_minutes'],
-                        mode='markers',
-                        marker=dict(color='blue', size=8, opacity=0.5),
-                        name='Normal'
-                    ))
-                    
-                    # Add anomalies
-                    anomaly_data = all_data[all_data['is_anomaly']]
-                    fig.add_trace(go.Scatter(
-                        x=anomaly_data['bildankunft_timestamp'],
-                        y=anomaly_data['processing_delay_minutes'],
-                        mode='markers',
-                        marker=dict(color='red', size=12, symbol='x'),
-                        name='Anomaly'
-                    ))
-                    
-                    # Add title and labels
-                    method_name = {
-                        'zscore': 'Z-Score',
-                        'iqr': 'IQR',
-                        'percentile': 'Percentile',
-                        'absolute': 'Absolute Threshold'
-                    }.get(method, method)
-                    
-                    fig.update_layout(
-                        title=f'Processing Delay Anomalies ({method_name} Method)',
-                        xaxis_title='Time',
-                        yaxis_title='Processing Delay (minutes)',
-                        template='plotly_white'
-                    )
-                    
-                    return fig, summary_html
+        def export_csv(n_clicks):
+            if n_clicks:
+                # Implement CSV export functionality here
+                pass
+            return None
+    
+    def _get_date_range(self, date_range_value):
+        """Convert date range dropdown value to date tuple."""
+        if not date_range_value or not self.available_dates:
+            return None
             
-            # Return empty figure if detection fails
-            return go.Figure(), ""
+        if date_range_value == 'all':
+            return None
+            
+        end_date = max(self.available_dates) if self.available_dates else None
+        if not end_date:
+            return None
+            
+        if date_range_value == 'last_7_days':
+            start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=7)).strftime('%Y-%m-%d')
+            return (start_date, end_date)
+            
+        elif date_range_value == 'last_30_days':
+            start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
+            return (start_date, end_date)
+            
+        return None
     
     def run_server(self, debug=False, port=8050):
         """

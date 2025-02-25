@@ -146,120 +146,108 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Michael Gottschalk for the concept
 - PyQt6 team for the GUI framework
 
-# Image Distribution Analysis Tool
+# Image Distribution Analysis
 
-A comprehensive tool for analyzing image distribution workflows, detecting anomalies, and identifying patterns in processing delays.
+A tool for analyzing the distribution timing of images from reception to publication. This tool provides both a simple command-line script for quick analysis and a more interactive dashboard for deeper exploration.
 
-## Overview
+## Features
 
-This tool helps analyze the distribution of images from receipt to publication, providing insights into:
-
-- Processing delays across different time periods
-- Anomaly detection for identifying unusual processing patterns
-- Timeline analysis for understanding peak times and bottlenecks
-- Distribution patterns by weekday and hour
+- **Data Import**: Import image data from CSV files into a SQLite database
+- **Basic Analysis**: Generate heatmaps showing processing delays by weekday and hour
+- **Interactive Dashboard**: Explore data with an interactive web-based dashboard
+- **Anomaly Detection**: Identify unusual patterns or outliers in processing times
 
 ## Project Structure
 
 ```
-├── data/
-│   ├── raw/             # Raw CSV data files
-│   └── processed/       # Processed data and database files
-├── src/
-│   ├── modules/
-│   │   ├── data_preparation/
-│   │   │   ├── csv_importer.py
-│   │   │   ├── data_cleaner.py
-│   │   │   └── database.py
-│   │   ├── interactive_analysis/
-│   │   │   ├── timeline_analyzer.py
-│   │   │   ├── anomaly_detector.py
-│   │   │   └── dashboard.py
-│   │   └── reporting_engine/
-│   │       └── report_generator.py
-│   ├── cli.py           # Command-line interface
-│   └── run_dashboard.py # Dashboard runner
-└── requirements.txt     # Project dependencies
+├── deployment-analyse.py      # Simple analysis script (single file)
+├── requirements.txt           # Python dependencies
+├── src/                       # Source code directory
+│   ├── cli.py                 # Command-line interface
+│   ├── run_dashboard.py       # Dashboard runner script
+│   └── modules/               # Core modules
+│       ├── data_preparation/  # Data import and cleaning modules
+│       └── interactive_analysis/ # Analysis and visualization modules
+└── db/                        # Database directory
 ```
 
 ## Installation
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/image-distribution-analysis.git
-cd image-distribution-analysis
-```
+1. Clone this repository
+2. Install dependencies:
 
-2. Create a virtual environment (optional but recommended):
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
 ## Usage
 
-### Command-line Interface
+### Quick Analysis with deployment-analyse.py
 
-The tool provides a command-line interface for various operations:
+For a simple analysis that generates a heatmap of processing delays:
 
-#### Import Data
-
-Import and process CSV data:
 ```bash
-python src/cli.py import --file data/raw/deployments.csv
+python deployment-analyse.py --file your_data.xlsx --output heatmap.png
 ```
 
-#### Analyze Timeline
+This will:
+- Read your Excel file
+- Calculate processing delays
+- Generate a heatmap showing average delays by weekday and hour
+- Display basic statistics in the console
 
-Analyze time patterns in the data:
+### Full Analysis with Interactive Dashboard
+
+For more detailed analysis:
+
+1. Import your data into the database:
+
 ```bash
-python src/cli.py analyze --data-dir data/processed --granularity hour
+python src/cli.py import --file your_data.csv --db-path db/image_distribution.db --store
 ```
 
-#### Detect Anomalies
+2. Run the interactive dashboard:
 
-Detect anomalies in processing delays:
 ```bash
-python src/cli.py anomaly --data-dir data/processed --method zscore
+python src/run_dashboard.py --db-path db/image_distribution.db
 ```
 
-### Interactive Dashboard
+3. Open your web browser and navigate to: `http://127.0.0.1:8050`
 
-The tool includes an interactive web dashboard for data exploration and analysis:
+## Dashboard Features
 
-1. Start the dashboard:
-```bash
-python src/run_dashboard.py --db-path data/processed/deployments.db
-```
+The simplified dashboard provides:
 
-2. Open your web browser and navigate to `http://127.0.0.1:8050`
+- **Core Statistics**: Total records, average/min/max processing delays
+- **Heatmap Visualization**: Processing delays by weekday and hour
+- **Advanced Analysis**: Expandable section with timeline analysis and anomaly detection
+- **Export Options**: Save visualizations as PNG or data as CSV
 
-3. Use the dashboard to:
-   - Select date ranges for analysis
-   - Visualize time patterns through line charts
-   - Explore weekday-hour heatmaps for pattern identification
-   - Detect and visualize anomalies with various methods
+## CSV Format Requirements
 
-Dashboard options:
-- `--port`: Specify the port to run the dashboard (default: 8050)
-- `--debug`: Run in debug mode with auto-reloading
-- `--db-path`: Specify the path to the database file (default: data/processed/deployments.db)
+Your CSV file should include the following columns:
+- `bildankunft_timestamp`: When the image was received
+- `onlinestellung_timestamp`: When the image was published
+- `processing_delay_minutes`: Delay between reception and publication
+
+Additional columns will be stored but are not required for analysis.
+
+## Troubleshooting
+
+- If you encounter module import errors, ensure you've installed all dependencies with `pip install -r requirements.txt`
+- Check that the database directory exists: `mkdir -p db`
+- For Windows users, use backslashes in file paths: `python src\run_dashboard.py --db-path db\image_distribution.db`
 
 ## Dependencies
 
-- pandas: Data manipulation and analysis
-- numpy: Numerical computing
-- matplotlib: Plotting library
-- plotly: Interactive visualizations
-- dash: Web application framework for dashboard
-- dash-bootstrap-components: Bootstrap components for Dash
-- scikit-learn: Machine learning algorithms for anomaly detection
-- sqlite3: Database storage (built-in with Python)
+- pandas
+- numpy
+- matplotlib
+- seaborn
+- plotly
+- dash
+- dash-bootstrap-components
+- SQLite3 (built into Python)
 
 ## License
 

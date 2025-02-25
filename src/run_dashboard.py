@@ -4,7 +4,7 @@
 """
 Dashboard Runner
 
-This script initializes and runs the interactive dashboard for the
+This script initializes and runs the simplified interactive dashboard for the
 image distribution analysis system.
 """
 
@@ -37,8 +37,8 @@ def parse_arguments():
     parser.add_argument(
         "--db-path",
         type=str,
-        default="data/processed/deployments.db",
-        help="Path to the SQLite database file (default: data/processed/deployments.db)"
+        default="db/image_distribution.db",
+        help="Path to the SQLite database file (default: db/image_distribution.db)"
     )
     
     parser.add_argument(
@@ -66,7 +66,9 @@ def main():
     # Check if database file exists
     if not os.path.exists(args.db_path):
         logger.error(f"Database file not found: {args.db_path}")
-        logger.info("Please run the data import script first to create the database.")
+        logger.info("Please import your data first using the following command:")
+        logger.info(f"python src/cli.py import --file yourfile.csv --db-path {args.db_path} --store")
+        logger.info("For more information on importing data, run: python src/cli.py import --help")
         return
     
     try:
@@ -76,10 +78,10 @@ def main():
         
         # Initialize analyzers
         logger.info("Initializing timeline analyzer")
-        timeline_analyzer = TimelineAnalyzer(db)
+        timeline_analyzer = TimelineAnalyzer(db_connection=db)
         
         logger.info("Initializing anomaly detector")
-        anomaly_detector = AnomalyDetector(db)
+        anomaly_detector = AnomalyDetector(db_connection=db)
         
         # Initialize dashboard
         logger.info("Initializing dashboard")
@@ -92,6 +94,16 @@ def main():
         # Run the dashboard
         logger.info(f"Starting dashboard on port {args.port}")
         app = dashboard.initialize_app()
+        
+        # Display access instructions
+        url = f"http://127.0.0.1:{args.port}"
+        logger.info("=" * 60)
+        logger.info(f"Dashboard is running at: {url}")
+        logger.info("Open the above URL in your web browser to access the dashboard")
+        logger.info("Press Ctrl+C to stop the server")
+        logger.info("=" * 60)
+        
+        # Start the server
         dashboard.run_server(debug=args.debug, port=args.port)
         
     except Exception as e:
