@@ -24,9 +24,27 @@ import time
 from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk
 import numpy as np
 import matplotlib
+import csv
+import logging
+from logging.handlers import RotatingFileHandler
+
+# Set up logging
+os.makedirs('logs', exist_ok=True)
+log_file = os.path.join('logs', 'deployment_analysis.log')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=2)
+    ]
+)
+logger = logging.getLogger(__name__)
+logger.info("Logging system initialized")
+
 # Set backend to TkAgg for GUI applications
 matplotlib.use('TkAgg')
-import csv
+logger.info(f"Using {matplotlib.get_backend()} backend for matplotlib")
 
 # Configure locale for German weekday names
 try:
@@ -35,7 +53,7 @@ except:
     try:
         locale.setlocale(locale.LC_TIME, 'German')
     except:
-        pass  # If neither works, use system default
+        logger.warning("Could not set German locale. Using system default.")
 
 class DeploymentAnalyzer:
     """
@@ -408,6 +426,9 @@ class DeploymentAnalyzer:
 
             # Create new figure
             fig, ax = plt.subplots(figsize=figsize)
+            
+            # Ensure consistent rectangle sizes for incomplete datasets by setting aspect
+            ax.set_aspect('equal', adjustable='box', anchor='C')
             
             # Create heatmap
             sns.heatmap(
@@ -1055,6 +1076,11 @@ class SimpleAnalysisGUI:
             height = max(8, min(len(pivot_table.index) * 0.4, 16))
             width = max(10, min(len(pivot_table.columns) * 0.8, 20))
             
+            # Use non-interactive backend to avoid thread issues
+            import matplotlib
+            default_backend = matplotlib.get_backend()
+            matplotlib.use('Agg')
+            
             # Create the figure
             fig, ax = plt.subplots(figsize=(width, height))
             
@@ -1084,6 +1110,9 @@ class SimpleAnalysisGUI:
             
             # Adjust layout
             plt.tight_layout()
+            
+            # Switch back to the original backend
+            matplotlib.use(default_backend)
             
             # Display the figure
             self.display_figure(fig)
@@ -1189,8 +1218,17 @@ class SimpleAnalysisGUI:
             height = max(8, min(len(pivot_table.index) * 0.4, 16))
             width = max(10, min(len(pivot_table.columns) * 0.8, 20))
             
+            # Use non-interactive backend to avoid thread issues
+            import matplotlib
+            default_backend = matplotlib.get_backend()
+            matplotlib.use('Agg')
+            
             # Create the figure
             fig, ax = plt.subplots(figsize=(width, height))
+            
+            # Set aspect ratio for consistent cell sizes - only for weekly and monthly views
+            if current_granularity in ['weekly', 'monthly']:
+                ax.set_aspect('equal', adjustable='box', anchor='C')
             
             # Create the heatmap with a color map
             sns.heatmap(
@@ -1203,6 +1241,7 @@ class SimpleAnalysisGUI:
             )
             
             # Set titles and labels
+            current_granularity = self.selected_granularity.get()
             title = f"Deployment Delays"
             if current_granularity == "monthly":
                 subtitle = "Monthly View (Day × Hour)"
@@ -1218,6 +1257,9 @@ class SimpleAnalysisGUI:
             # Adjust layout
             plt.tight_layout()
             
+            # Switch back to the original backend
+            matplotlib.use(default_backend)
+            
             # Display the figure
             self.display_figure(fig)
             
@@ -1226,11 +1268,20 @@ class SimpleAnalysisGUI:
             print(error_msg)
             # Create an error figure if possible
             try:
+                # Use non-interactive backend for error figure too
+                import matplotlib
+                default_backend = matplotlib.get_backend()
+                matplotlib.use('Agg')
+                
                 fig, ax = plt.subplots(figsize=(8, 6))
                 ax.text(0.5, 0.5, f"Visualization Error:\n\n{error_msg}", 
                         ha='center', va='center', fontsize=12, wrap=True)
                 ax.axis('off')
                 fig.is_error_figure = True
+                
+                # Switch back to the original backend
+                matplotlib.use(default_backend)
+                
                 self.display_figure(fig)
             except:
                 # Last resort fallback
