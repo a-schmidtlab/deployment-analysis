@@ -372,6 +372,10 @@ class DeploymentAnalyzer:
             }
             pivot.index = [month_names.get(m, m) for m in pivot.index]
             
+            # Calculate global min and max for monthly averages
+            self.global_min = pivot.min().min()
+            self.global_max = pivot.max().max()
+        
         elif granularity == "yearly":
             # Create a date column combining year, month, and day for each entry
             data['Date'] = pd.to_datetime(data['Bildankunft'].dt.date)
@@ -503,7 +507,9 @@ class DeploymentAnalyzer:
             cmap_with_white.set_bad('white', 1.0)  # Set NaN cells to white
             
             # Determine appropriate linewidth based on view type
-            if granularity == 'yearly' and rows > 20:
+            if granularity == 'yearly':
+                linewidth = 0  # No lines for yearly view to remove spacing between rectangles
+            elif granularity == 'yearly' and rows > 20:
                 linewidth = 0.2  # Thinner lines for yearly view with many rows
             else:
                 linewidth = 0.5
@@ -1312,7 +1318,9 @@ class SimpleAnalysisGUI:
             mask = np.isnan(pivot_table.values)  # Using .values to avoid Series truth value ambiguity
             
             # Determine appropriate linewidth based on view type
-            if current_granularity == 'yearly' and rows > 20:
+            if current_granularity == 'yearly':
+                linewidth = 0  # No lines for yearly view to remove spacing between rectangles
+            elif current_granularity == 'yearly' and rows > 20:
                 linewidth = 0.2  # Thinner lines for yearly view with many rows
             else:
                 linewidth = 0.5
@@ -1599,7 +1607,9 @@ class SimpleAnalysisGUI:
             mask = np.isnan(pivot_table.values)  # Using .values to avoid Series truth value ambiguity
             
             # Determine appropriate linewidth based on view type
-            if current_granularity == 'yearly' and rows > 20:
+            if current_granularity == 'yearly':
+                linewidth = 0  # No lines for yearly view to remove spacing between rectangles
+            elif current_granularity == 'yearly' and rows > 20:
                 linewidth = 0.2  # Thinner lines for yearly view with many rows
             else:
                 linewidth = 0.5
