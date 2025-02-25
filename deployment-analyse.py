@@ -700,7 +700,7 @@ class SimpleAnalysisGUI:
     def __init__(self, root):
         """Initialize the GUI with screen-fitting size."""
         self.root = root
-        self.root.title("Image Deployment Analysis")
+        self.root.title("deployment-analyse ver. 1.0.0")
         
         # Set window to fit screen with some margin
         screen_width = self.root.winfo_screenwidth()
@@ -780,6 +780,8 @@ class SimpleAnalysisGUI:
         """Create all widgets for the GUI with optimized space usage."""
         padding = {"padx": 3, "pady": 3}
         
+        # Using regular tk.Button with direct color styling for the import button
+        
         # CONTROL PANEL WIDGETS -------------------------
         # File selection frame - more compact
         self.file_frame = ttk.LabelFrame(self.control_panel, text="File Selection")
@@ -787,7 +789,10 @@ class SimpleAnalysisGUI:
         # File path entry and browse button
         self.path_var = tk.StringVar()
         self.path_entry = ttk.Entry(self.file_frame, textvariable=self.path_var, width=50)
-        self.browse_button = ttk.Button(self.file_frame, text="Browse...", command=self.browse_file)
+        self.browse_button = tk.Button(self.file_frame, text="Import", command=self.browse_file, 
+                                      bg="#90EE90", activebackground="#7CCD7C", 
+                                      relief=tk.RAISED, padx=10, pady=2,
+                                      borderwidth=2, cursor="hand2")
         self.add_file_button = ttk.Button(self.file_frame, text="+ Add Data", command=self.add_file)
         
         # Quick stats frame - more compact
@@ -1971,10 +1976,14 @@ class SimpleAnalysisGUI:
         if self.current_figure is None:
             messagebox.showwarning("No Visualization", "Please run the analysis first.")
             return
+        
+        # Create a descriptive filename based on current view
+        default_filename = self._generate_export_filename("heatmap", ".png")
             
         file_path = filedialog.asksaveasfilename(
             title="Save Heatmap",
             defaultextension=".png",
+            initialfile=default_filename,
             filetypes=[
                 ("PNG Image", "*.png"),
                 ("PDF Document", "*.pdf"),
@@ -2005,10 +2014,14 @@ class SimpleAnalysisGUI:
         if self.analyzer.cleaned_data is None:
             messagebox.showwarning("No Data", "Please run the analysis first.")
             return
+        
+        # Create a descriptive filename based on current view
+        default_filename = self._generate_export_filename("data", ".csv")
             
         file_path = filedialog.asksaveasfilename(
             title="Export Data",
             defaultextension=".csv",
+            initialfile=default_filename,
             filetypes=[
                 ("CSV File", "*.csv"),
                 ("Excel File", "*.xlsx"),
@@ -2035,89 +2048,96 @@ class SimpleAnalysisGUI:
     def show_help(self):
         """Show a help dialog."""
         help_window = tk.Toplevel(self.root)
-        help_window.title("Help - Image Deployment Analysis")
-        help_window.geometry("600x500")
-        help_window.minsize(500, 400)
+        help_window.title("deployment-analyse ver. 1.0.0")
+        help_window.geometry("700x650")
+        help_window.minsize(650, 600)
         
         # Create a frame with scrollable text
         frame = ttk.Frame(help_window)
-        frame.pack(fill="both", expand=True, padx=10, pady=10)
+        frame.pack(fill="both", expand=True, padx=20, pady=15)
         
         # Add a scrollbar
         scrollbar = ttk.Scrollbar(frame)
         scrollbar.pack(side="right", fill="y")
         
         # Create a text widget with the scrollbar
-        text = tk.Text(frame, wrap="word", yscrollcommand=scrollbar.set)
+        text = tk.Text(frame, wrap="word", yscrollcommand=scrollbar.set, 
+                      font=("Helvetica", 11), padx=10, pady=5)
         text.pack(side="left", fill="both", expand=True)
         scrollbar.config(command=text.yview)
         
         # Help text
         help_text = """
-        # Image Deployment Analysis Tool - Help
-        
-        This tool analyzes the processing delays in image deployment systems.
-        
-        ## Getting Started
-        
-        1. Use the 'Browse...' button to select your Excel or CSV file.
-        2. Click the 'Run Analysis' button to process the data.
-        3. Use the time period controls at the bottom to navigate different views.
-        
-        ## Screen Layout
-        
-        The screen is divided into three main sections:
-        
-        1. **Top Control Panel**: Contains file selection, statistics, and the current view indicator.
-        2. **Center Visualization Area**: Displays the heatmap visualization (the main focus).
-        3. **Bottom Navigation Panel**: Contains the time period selection controls.
-        
-        ## View Types
-        
-        You can select from four different view types:
-        
-        - **Daily (By Month)**: Shows daily patterns within a selected month, with days on the Y-axis and hours on the X-axis.
-        - **Daily (By Week)**: Shows daily patterns within a selected week, with weekdays on the Y-axis and hours on the X-axis.
-        - **Monthly (By Year)**: Shows monthly patterns within a selected year, with months on the Y-axis and hours on the X-axis.
-        - **Combined**: Shows aggregate data by hour across all available data.
-        
-        ## Time Period Navigation
-        
-        The hierarchical time period buttons allow you to:
-        
-        - Select a specific year to view its monthly pattern
-        - Select a specific month to view its daily pattern
-        - Select a specific week to view its daily pattern
-        
-        ## Understanding the Heatmap
-        
-        - The heatmap displays average processing delays across time periods.
-        - Darker/more intense colors indicate longer processing delays.
-        - The scale is in minutes.
-        
-        ## Exporting Results
-        
-        - Use the 'Export Image' button to save the current heatmap visualization as a PNG file.
-        - Use the 'Export Data' button to save the processed data as a CSV or Excel file.
-        
-        ## Adding More Data
-        
-        You can add additional data files by clicking the '+ Add Data' button. This allows you to:
-        
-        - Combine multiple data sources for analysis
-        - Compare different time periods or systems
-        - Build a more comprehensive dataset
-        
-        """
+# deployment-analyse ver. 1.0.0
+
+Copyright © 2025 Axel Schmidt. All rights reserved.
+
+This tool analyzes the processing delays in image deployment systems.
+
+## Getting Started
+
+1. Use the 'Import' button to select your Excel or CSV file.
+2. The analysis will run automatically after importing the file.
+3. Use the time period controls at the bottom to navigate different views.
+
+## Screen Layout
+
+The screen is divided into three main sections:
+
+1. **Top Control Panel**: Contains file selection, statistics, and the current view indicator.
+2. **Center Visualization Area**: Displays the heatmap visualization (the main focus).
+3. **Bottom Navigation Panel**: Contains the time period selection controls.
+
+## View Types
+
+The application supports different view types:
+
+- **Yearly View**: Shows patterns across a full year, with dates on the Y-axis 
+  and hours on the X-axis. This is the default view after importing data.
+- **Monthly View**: Shows daily patterns within a selected month, with days on the Y-axis 
+  and hours on the X-axis.
+- **Weekly View**: Shows daily patterns within a selected week, with weekdays on the Y-axis 
+  and hours on the X-axis.
+
+## Time Period Navigation
+
+The time period buttons at the bottom allow you to:
+
+- Select a specific year to view its yearly pattern
+- Select a specific month to view its daily pattern
+- Select a specific week to view its daily pattern
+
+## Understanding the Heatmap
+
+- The heatmap displays average processing delays across time periods.
+- Darker/more intense colors indicate longer processing delays.
+- The scale is in minutes.
+
+## Exporting Results
+
+- Use the 'Export Image' button to save the current heatmap visualization as a PNG file.
+- Use the 'Export Data' button to save the processed data as a CSV or Excel file.
+
+## Adding More Data
+
+You can add additional data files by clicking the '+ Add Data' button. This allows you to:
+
+- Combine multiple data sources for analysis
+- Compare different time periods or systems
+- Build a more comprehensive dataset
+"""
         
         # Insert the help text
         text.insert("1.0", help_text)
         text.config(state="disabled")  # Make it read-only
         
         # Add a close button
-        close_button = ttk.Button(help_window, text="Close", command=help_window.destroy)
-        close_button.pack(pady=10)
-
+        button_frame = ttk.Frame(help_window)
+        button_frame.pack(pady=15, padx=20, fill="x")
+        
+        close_button = ttk.Button(button_frame, text="Close", command=help_window.destroy, width=15)
+        close_button.pack(side="right")
+    
     def _update_stats_from_dict(self, stats):
         """Update the statistics labels with values from the stats dictionary."""
         try:
@@ -2274,6 +2294,25 @@ class SimpleAnalysisGUI:
             # Last resort if even creating an error figure fails
             print(f"Failed to create error figure: {str(e)}")
             self.update_status("Visualization failed")
+
+    def _generate_export_filename(self, prefix, extension):
+        """Generate a descriptive filename based on current view."""
+        # Add timestamp for uniqueness
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        current_granularity = self.selected_granularity.get()
+        if current_granularity == "yearly" and self.selected_year is not None:
+            return f"{prefix}_year_{self.selected_year}_{timestamp}{extension}"
+        elif current_granularity == "monthly" and self.selected_month is not None and self.selected_year is not None:
+            month_name = {
+                1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
+                7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'
+            }.get(self.selected_month, f"{self.selected_month}")
+            return f"{prefix}_month_{month_name}_{self.selected_year}_{timestamp}{extension}"
+        elif current_granularity == "weekly" and self.selected_week is not None and self.selected_year is not None:
+            return f"{prefix}_week_{self.selected_week}_{self.selected_year}_{timestamp}{extension}"
+        else:  # "hourly" (combined view) or any other case
+            return f"{prefix}_{current_granularity}_{timestamp}{extension}"
 
 def parse_arguments():
     """Parse command-line arguments."""
