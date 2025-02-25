@@ -561,17 +561,31 @@ class DeploymentAnalyzer:
                 if rows > 25:
                     # Show approximately 20 tick labels (one every N rows)
                     tick_step = max(1, rows // 20)
+                    
+                    # Create indices that are guaranteed to be within bounds
+                    # This ensures we don't try to access indices beyond the size of the array
                     visible_ticks = list(range(0, rows, tick_step))
                     
-                    # Always include the first and last tick
-                    if visible_ticks and visible_ticks[-1] != rows - 1:
-                        visible_ticks.append(rows - 1)
+                    # Always include the first and last tick if not already included
+                    if len(visible_ticks) > 0 and visible_ticks[-1] != rows - 1:
+                        if rows - 1 not in visible_ticks:  # Only append if not already there
+                            visible_ticks.append(rows - 1)
                     
-                    # Set visible y-ticks and format them
-                    y_ticks = ax.get_yticks()
-                    ax.set_yticks([y_ticks[i] for i in visible_ticks])
-                    ax.set_yticklabels([self.pivot_table.index[i] for i in visible_ticks], 
-                                       fontsize=6, rotation=0)
+                    # Safety check - ensure all indices are within bounds
+                    visible_ticks = [i for i in visible_ticks if 0 <= i < rows]
+                    
+                    if len(visible_ticks) > 0:  # Only proceed if we have valid ticks
+                        # Get current ticks
+                        y_ticks = ax.get_yticks()
+                        
+                        # Extra safety check to ensure we don't have an index error
+                        valid_indices = [i for i in visible_ticks if i < len(y_ticks)]
+                        
+                        if valid_indices:  # Only proceed if we have valid indices
+                            # Set visible y-ticks and format them
+                            ax.set_yticks([y_ticks[i] for i in valid_indices])
+                            ax.set_yticklabels([self.pivot_table.index[i] for i in valid_indices], 
+                                             fontsize=6, rotation=0)
                 else:
                     # For smaller datasets, just set the font size
                     plt.setp(ax.get_yticklabels(), fontsize=6, rotation=0)
@@ -1223,40 +1237,172 @@ class SimpleAnalysisGUI:
             
             # Get the pivot table and create the heatmap
             pivot_table = self.analyzer.pivot_table
+            current_granularity = self.selected_granularity.get()
             
             # Calculate figure size dynamically based on data dimensions
-            height = max(8, min(len(pivot_table.index) * 0.4, 16))
-            width = max(10, min(len(pivot_table.columns) * 0.8, 20))
+            # For large datasets, use a more conservative scaling to prevent overflow
+            rows = len(pivot_table.index)
+            cols = len(pivot_table.columns)
+            
+            # Define standard dimensions for complete datasets to ensure consistent square sizes
+            standard_rows = {"monthly": 12, "weekly": 7, "yearly": rows, "hourly": 1}
+            standard_cols = 24  # Hours in a day
+            
+            
+            # Use standard dimensions for calculating aspect ratio to ensure consistent square sizes
+            if current_granularity in ['monthly', 'weekly']:
+                std_rows = standard_rows.get(current_granularity, rows)
+                # Calculate figure size based on standard dimensions rather than actual data size
+                # This ensures consistent square sizes regardless of dataset completeness
+                height = max(8, min(std_rows * 0.4, 16))
+                width = max(10, min(standard_cols * 0.8, 20))
+            elif current_granularity == 'yearly':
+                # For yearly view, use a more balanced approach to sizing
+                # Aim for rectangles with 2:1 ratio (twice as wide as tall)
+                row_to_col_ratio = rows / cols
+                # Calculate width based on number of columns (hours) - increased for better screen usage
+                width = max(16, min(cols * 0.8, 24))  # Increased width for wider rectangles
+                # Calculate height based on width and row-to-column ratio, but half as tall for 2:1 ratio
+                height = max(6, min(width * row_to_col_ratio * 0.35, 18))  # Adjusted ratio for 2:1 rectangles
+                
+                # Limit height for very large datasets to prevent excessive stretching
+                if rows > 40:
+                    height = min(height, 20)
+            else:
+                # For other views, use the actual data dimensions
+                if rows > 20 or cols > 24:
+                    height = max(8, min(rows * 0.3, 14))
+                    width = max(10, min(cols * 0.6, 18))
+                else:
+                    height = max(8, min(rows * 0.4, 16))
+                    width = max(10, min(cols * 0.8, 20))
             
             # Use non-interactive backend to avoid thread issues
             import matplotlib
             default_backend = matplotlib.get_backend()
             matplotlib.use('Agg')
             
-            # Create the figure
+            # Create the figure with extra padding for title and labels
             fig, ax = plt.subplots(figsize=(width, height))
             
-            # Create the heatmap with a color map
+            # Set aspect ratio - for yearly view, use 2:1 rectangles instead of squares
+            if current_granularity in ['weekly', 'monthly']:
+                # Use square cells for weekly and monthly views
+                ax.set_aspect('equal', adjustable='box', anchor='C')
+            elif current_granularity == 'yearly':
+                # For yearly view, use rectangles twice as wide as tall (2:1 ratio)
+                # We set aspect to 0.5 to make cells twice as wide as tall
+                ax.set_aspect(0.5, adjustable='box', anchor='C')
+            
+            # Custom colormap with white for NaN/missing values - using updated method to avoid deprecation warning
+            try:
+                # Modern matplotlib approach (3.7+)
+                cmap = matplotlib.colormaps["RdYlGn_r"].copy()
+            except (AttributeError, KeyError):
+                # Fallback for older versions
+                try:
+                    cmap = plt.get_cmap("RdYlGn_r").copy()  # Use plt.get_cmap instead of plt.cm.get_cmap
+                except:
+                    # Last resort fallback
+                    cmap = plt.cm.get_cmap("RdYlGn_r").copy()
+                    
+            cmap.set_bad('white', 1.0)  # Set NaN cells to white
+            
+            # Create a mask for NaN values
+            mask = np.isnan(pivot_table.values)  # Using .values to avoid Series truth value ambiguity
+            
+            # Determine appropriate linewidth based on view type
+            if current_granularity == 'yearly' and rows > 20:
+                linewidth = 0.2  # Thinner lines for yearly view with many rows
+            else:
+                linewidth = 0.5
+            
+            # Compute vmin and vmax for adaptive color scaling
+            # If it's yearly view, we want to adapt the color scale to show more variation
+            vmin, vmax = None, None  # Default values
+            if current_granularity == 'yearly':
+                # Calculate quartile-based bounds to emphasize the variation in the middle of the data
+                # Get the data as numpy array to avoid Series truth value ambiguity
+                data_values = pivot_table.values
+                if not np.all(mask):  # Using numpy's all instead of mask.all()
+                    data_flat = data_values.flatten()
+                    data_flat = data_flat[~np.isnan(data_flat)]  # Filter out NaN values
+                    
+                    if len(data_flat) > 0:
+                        # For very low variation data, use percentiles closer to median
+                        data_std = np.std(data_flat)
+                        data_range = np.max(data_flat) - np.min(data_flat)
+                        
+                        # If data has low variation, use tighter percentiles to enhance contrast
+                        if data_range < 5 or data_std < 2:
+                            vmin = np.percentile(data_flat, 30)  # 30th percentile
+                            vmax = np.percentile(data_flat, 90)  # 90th percentile
+                        else:
+                            vmin = np.percentile(data_flat, 10)  # 10th percentile
+                            vmax = np.percentile(data_flat, 95)  # 95th percentile
+                            
+                        # Ensure vmin and vmax are not the same to prevent colormap issues
+                        if vmin == vmax:
+                            vmin = 0 if vmin == 0 else vmin * 0.9
+                            vmax = vmax * 1.1
+            
+            # Create the heatmap with a color map - without annotations
             sns.heatmap(
                 pivot_table, 
-                cmap="RdYlGn_r", 
-                linewidths=0.5, 
-                ax=ax, 
-                cbar_kws={'label': 'Delay (minutes)'},
-                robust=True  # Makes the colormap robust to outliers
+                cmap=cmap,
+                linewidths=linewidth,
+                annot=False,  # No annotations as requested by user
+                cbar_kws={'label': 'Average Delay (minutes)'},
+                mask=mask,  # Mask NaN values
+                vmin=vmin,  # Custom range for color scaling
+                vmax=vmax,
+                robust=True,  # Use robust quantile-based scaling for color range
+                ax=ax
             )
             
             # Set titles and labels
             current_granularity = self.selected_granularity.get()
             title = f"Deployment Delays"
             
-            # Set smaller font size for tick labels in year view to make dates fit better
+            # Optimize tick labels display based on the view type
             if current_granularity == "yearly":
-                # Reduce font size for both x and y tick labels
+                # Special handling for yearly view to make it more compact and readable
+                # Reduce font size for tick labels
                 plt.setp(ax.get_xticklabels(), fontsize=6, rotation=45, ha='right')
-                plt.setp(ax.get_yticklabels(), fontsize=6)
-                # Rotate y-axis tick labels to fit better
-                plt.setp(ax.get_yticklabels(), rotation=0)
+                
+                # For yearly view with many rows, show fewer y-tick labels
+                if rows > 25:
+                    # Show approximately 20 tick labels (one every N rows)
+                    tick_step = max(1, rows // 20)
+                    
+                    # Create indices that are guaranteed to be within bounds
+                    # This ensures we don't try to access indices beyond the size of the array
+                    visible_ticks = list(range(0, rows, tick_step))
+                    
+                    # Always include the first and last tick if not already included
+                    if len(visible_ticks) > 0 and visible_ticks[-1] != rows - 1:
+                        if rows - 1 not in visible_ticks:  # Only append if not already there
+                            visible_ticks.append(rows - 1)
+                    
+                    # Safety check - ensure all indices are within bounds
+                    visible_ticks = [i for i in visible_ticks if 0 <= i < rows]
+                    
+                    if len(visible_ticks) > 0:  # Only proceed if we have valid ticks
+                        # Get current ticks
+                        y_ticks = ax.get_yticks()
+                        
+                        # Extra safety check to ensure we don't have an index error
+                        valid_indices = [i for i in visible_ticks if i < len(y_ticks)]
+                        
+                        if valid_indices:  # Only proceed if we have valid indices
+                            # Set visible y-ticks and format them
+                            ax.set_yticks([y_ticks[i] for i in valid_indices])
+                            ax.set_yticklabels([pivot_table.index[i] for i in valid_indices], 
+                                             fontsize=6, rotation=0)
+                else:
+                    # For smaller datasets, just set the font size
+                    plt.setp(ax.get_yticklabels(), fontsize=6, rotation=0)
+                
                 subtitle = f"Yearly View for {self.selected_year} (Date × Hour)"
             elif current_granularity == "monthly":
                 subtitle = "Monthly View (Day × Hour)"
@@ -1265,10 +1411,18 @@ class SimpleAnalysisGUI:
             else:
                 subtitle = "Combined View"
             
-            ax.set_title(f"{title}\n{subtitle}", fontsize=14)
+            # Use a smaller font size for the title on large heatmaps
+            title_fontsize = 14 if (rows <= 20 and cols <= 24) else 12
+            ax.set_title(f"{title}\n{subtitle}", fontsize=title_fontsize, pad=10)
             
-            # Adjust layout
-            plt.tight_layout()
+            # Adjust layout based on view type
+            if current_granularity == 'yearly' and rows > 25:
+                # More compact layout for large yearly views
+                plt.tight_layout(pad=1.2, h_pad=0.8, w_pad=0.8, rect=[0.03, 0.03, 0.97, 0.97])
+            elif rows > 20 or cols > 24:
+                plt.tight_layout(pad=1.5, h_pad=1.0, w_pad=1.0, rect=[0.05, 0.05, 0.95, 0.95])
+            else:
+                plt.tight_layout()
             
             # Switch back to the original backend
             matplotlib.use(default_backend)
@@ -1480,7 +1634,7 @@ class SimpleAnalysisGUI:
                             vmax = vmax * 1.1
             
             # Create the heatmap with a color map - without annotations
-            heatmap = sns.heatmap(
+            sns.heatmap(
                 pivot_table, 
                 cmap=cmap,
                 linewidths=linewidth,
@@ -1489,7 +1643,8 @@ class SimpleAnalysisGUI:
                 mask=mask,  # Mask NaN values
                 vmin=vmin,  # Custom range for color scaling
                 vmax=vmax,
-                robust=True  # Use robust quantile-based scaling for color range
+                robust=True,  # Use robust quantile-based scaling for color range
+                ax=ax
             )
             
             # Set titles and labels
@@ -1506,17 +1661,31 @@ class SimpleAnalysisGUI:
                 if rows > 25:
                     # Show approximately 20 tick labels (one every N rows)
                     tick_step = max(1, rows // 20)
+                    
+                    # Create indices that are guaranteed to be within bounds
+                    # This ensures we don't try to access indices beyond the size of the array
                     visible_ticks = list(range(0, rows, tick_step))
                     
-                    # Always include the first and last tick
-                    if visible_ticks and visible_ticks[-1] != rows - 1:
-                        visible_ticks.append(rows - 1)
+                    # Always include the first and last tick if not already included
+                    if len(visible_ticks) > 0 and visible_ticks[-1] != rows - 1:
+                        if rows - 1 not in visible_ticks:  # Only append if not already there
+                            visible_ticks.append(rows - 1)
                     
-                    # Set visible y-ticks and format them
-                    y_ticks = ax.get_yticks()
-                    ax.set_yticks([y_ticks[i] for i in visible_ticks])
-                    ax.set_yticklabels([pivot_table.index[i] for i in visible_ticks], 
-                                        fontsize=6, rotation=0)
+                    # Safety check - ensure all indices are within bounds
+                    visible_ticks = [i for i in visible_ticks if 0 <= i < rows]
+                    
+                    if len(visible_ticks) > 0:  # Only proceed if we have valid ticks
+                        # Get current ticks
+                        y_ticks = ax.get_yticks()
+                        
+                        # Extra safety check to ensure we don't have an index error
+                        valid_indices = [i for i in visible_ticks if i < len(y_ticks)]
+                        
+                        if valid_indices:  # Only proceed if we have valid indices
+                            # Set visible y-ticks and format them
+                            ax.set_yticks([y_ticks[i] for i in valid_indices])
+                            ax.set_yticklabels([pivot_table.index[i] for i in valid_indices], 
+                                             fontsize=6, rotation=0)
                 else:
                     # For smaller datasets, just set the font size
                     plt.setp(ax.get_yticklabels(), fontsize=6, rotation=0)
