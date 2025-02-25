@@ -99,3 +99,25 @@
 2025-02-25 19:09:08,671 - __main__ - INFO - [deployment-analyse.py:43] - Logging system initialized
 2025-02-25 19:09:08,672 - __main__ - INFO - [deployment-analyse.py:47] - Using TkAgg backend for matplotlib
 2025-02-25 19:14:49,023 - __main__ - INFO - [deployment-analyse.py:43] - Logging system initialized
+2025-02-25 20:17:50,322 - __main__ - INFO - [deployment-analyse.py:43] - Logging system initialized
+2025-02-25 20:17:50,322 - __main__ - INFO - [deployment-analyse.py:47] - Using TkAgg backend for matplotlib
+2025-02-25 20:27:14,111 - __main__ - INFO - [deployment-analyse.py:43] - Logging system initialized
+2025-02-25 20:27:14,112 - __main__ - INFO - [deployment-analyse.py:47] - Using TkAgg backend for matplotlib
+2025-02-25 20:52:53,144 - __main__ - INFO - [deployment-analyse.py:43] - Logging system initialized
+2025-02-25 20:52:53,145 - __main__ - INFO - [deployment-analyse.py:47] - Using TkAgg backend for matplotlib
+2025-02-25 21:11:32,656 - __main__ - INFO - [deployment-analyse.py:43] - Logging system initialized
+2025-02-25 21:11:32,657 - __main__ - INFO - [deployment-analyse.py:47] - Using TkAgg backend for matplotlib
+2025-02-25 21:15:11,767 - __main__ - INFO - [deployment-analyse.py:43] - Logging system initialized
+2025-02-25 21:15:11,768 - __main__ - INFO - [deployment-analyse.py:47] - Using TkAgg backend for matplotlib
+2025-02-25 21:22:59,660 - __main__ - INFO - [deployment-analyse.py:43] - Logging system initialized
+2025-02-25 21:22:59,661 - __main__ - INFO - [deployment-analyse.py:47] - Using TkAgg backend for matplotlib
+2025-02-25 21:24:58,962 - __main__ - INFO - [deployment-analyse.py:43] - Logging system initialized
+2025-02-25 21:24:58,963 - __main__ - INFO - [deployment-analyse.py:47] - Using TkAgg backend for matplotlib
+2025-02-25 21:27:22,829 - __main__ - INFO - [deployment-analyse.py:43] - Logging system initialized
+2025-02-25 21:27:22,830 - __main__ - INFO - [deployment-analyse.py:47] - Using TkAgg backend for matplotlib
+2025-02-25 21:28:32,086 - __main__ - INFO - [deployment-analyse.py:43] - Logging system initialized
+2025-02-25 21:28:32,088 - __main__ - INFO - [deployment-analyse.py:47] - Using TkAgg backend for matplotlib
+2025-02-25 21:30:16,981 - __main__ - INFO - [deployment-analyse.py:43] - Logging system initialized
+2025-02-25 21:30:16,982 - __main__ - INFO - [deployment-analyse.py:47] - Using TkAgg backend for matplotlib
+2025-02-25 21:31:39,347 - __main__ - INFO - [deployment-analyse.py:43] - Logging system initialized
+2025-02-25 21:31:39,348 - __main__ - INFO - [deployment-analyse.py:47] - Using TkAgg backend for matplotlib
