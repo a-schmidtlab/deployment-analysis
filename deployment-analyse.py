@@ -246,20 +246,19 @@ class DeploymentAnalyzer:
     
     def create_pivot_table(self, max_delay=None, granularity="daily"):
         """
-        Create a pivot table for visualization.
+        Create a pivot table of processing delays.
         
         Args:
-            max_delay (float): Maximum delay to include (None for no limit).
-            granularity (str): Time granularity ('daily', 'weekly', 'monthly', 'yearly').
+            max_delay: Maximum delay to include (in minutes)
+            granularity: Time granularity ('daily', 'weekly', 'monthly', 'yearly', 'hourly')
             
         Returns:
-            pd.DataFrame: Pivot table for visualization.
+            DataFrame: Pivot table
         """
         if self.cleaned_data is None:
-            print("No data available. Please import a file first.")
             return None
-        
-        # Make a copy of the data for filtering
+            
+        # Make a copy to avoid modifying the original
         data = self.cleaned_data.copy()
         
         # Apply max delay filter if specified
@@ -361,15 +360,15 @@ class DeploymentAnalyzer:
             pivot.index = [month_names.get(m, m) for m in pivot.index]
             
         elif granularity == "yearly":
-            # Pivot by year and month
-            data['Year'] = data['Bildankunft'].dt.year
+            # Pivot by month and day of month for the year view
             data['Month'] = data['Bildankunft'].dt.month
+            data['Day'] = data['Bildankunft'].dt.day
             
             pivot = pd.pivot_table(
                 data,
                 values='Verzögerung_Minuten',
-                index='Year',
-                columns='Month',
+                index='Month',
+                columns='Day',
                 aggfunc='mean',
                 fill_value=0
             )
@@ -379,7 +378,7 @@ class DeploymentAnalyzer:
                 1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
                 7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'
             }
-            pivot.columns = [month_names.get(m, m) for m in pivot.columns]
+            pivot.index = [month_names.get(m, m) for m in pivot.index]
             
         else:  # "hourly" (combined view)
             # Pivot by hour only, combining all dates
@@ -400,13 +399,14 @@ class DeploymentAnalyzer:
         self.pivot_table = pivot
         return pivot
     
-    def create_heatmap(self, cmap='YlOrRd', figsize=(10, 6)):
+    def create_heatmap(self, cmap='YlOrRd', figsize=(10, 6), granularity=None):
         """
         Create a heatmap visualization of the pivot table.
         
         Args:
             cmap: Colormap for the heatmap
             figsize: Figure size tuple (width, height)
+            granularity: Time granularity ('daily', 'weekly', 'monthly', 'yearly')
             
         Returns:
             Figure: Matplotlib figure object
@@ -427,8 +427,9 @@ class DeploymentAnalyzer:
             # Create new figure
             fig, ax = plt.subplots(figsize=figsize)
             
-            # Ensure consistent rectangle sizes for incomplete datasets by setting aspect
-            ax.set_aspect('equal', adjustable='box', anchor='C')
+            # Set aspect ratio for consistent cell sizes - only for weekly and monthly views
+            if granularity in ['weekly', 'monthly']:
+                ax.set_aspect('equal', adjustable='box', anchor='C')
             
             # Create heatmap
             sns.heatmap(
@@ -1246,7 +1247,7 @@ class SimpleAnalysisGUI:
             if current_granularity == "monthly":
                 subtitle = "Monthly View (Day × Hour)"
             elif current_granularity == "yearly":
-                subtitle = "Yearly View (Month × Hour)"
+                subtitle = f"Yearly View for {self.selected_year} (Month × Day)"
             elif current_granularity == "weekly":
                 subtitle = "Weekly View (Day × Hour)"
             else:
@@ -1518,7 +1519,9 @@ class SimpleAnalysisGUI:
                 
             # Filter data for the selected year
             filtered_df = self.analyzer.cleaned_data.copy()
-            filtered_df = filtered_df[filtered_df['Jahr'] == year]
+            
+            # Use 'Bildankunft' to filter by year rather than 'Jahr' column
+            filtered_df = filtered_df[filtered_df['Bildankunft'].dt.year == year]
             
             # Check if we have data
             if len(filtered_df) == 0:
@@ -1534,11 +1537,23 @@ class SimpleAnalysisGUI:
             # Temporarily replace with filtered data
             self.analyzer.cleaned_data = filtered_df
             
-            # Create pivot table with the filtered data
-            self.analyzer.create_pivot_table(granularity="yearly")
+            # Create pivot table with the filtered data - using month and day
+            pivot_table = self.analyzer.create_pivot_table(granularity="yearly")
             
-            # Create heatmap
-            fig = self.analyzer.create_heatmap()
+            # Store the pivot table for the main thread to use
+            self.current_pivot_table = pivot_table
+            self.current_granularity = "yearly"
+            
+            # Use the main thread to create and display the heatmap
+            self.root.after(0, self._create_heatmap_main_thread)
+            
+            # Update statistics based on filtered data
+            stats = {
+                'total_records': len(filtered_df),
+                'avg_delay': filtered_df['Verzögerung_Minuten'].mean(),
+                'min_delay': filtered_df['Verzögerung_Minuten'].min(),
+                'max_delay': filtered_df['Verzögerung_Minuten'].max()
+            }
             
             # Restore original data
             self.analyzer.cleaned_data = original_df
@@ -1546,24 +1561,8 @@ class SimpleAnalysisGUI:
             if not self.is_running:
                 return
                 
-            # Update visualization with the new figure
-            if fig:
-                self.root.after(0, lambda: self.display_figure(fig))
-                self.current_figure = fig
-                
-                # Update statistics
-                stats = {
-                    'total_records': len(filtered_df),
-                    'avg_delay': filtered_df['Verzögerung_Minuten'].mean(),
-                    'min_delay': filtered_df['Verzögerung_Minuten'].min(),
-                    'max_delay': filtered_df['Verzögerung_Minuten'].max()
-                }
-                
-                self.root.after(0, lambda: self._update_stats_from_dict(stats))
-                self.root.after(0, lambda: self.update_status(f"Analysis complete for year {year}"))
-            else:
-                self.root.after(0, lambda: self.update_status(f"Could not create visualization for year {year}"))
-                
+            self.root.after(0, lambda: self._update_stats_from_dict(stats))
+            self.root.after(0, lambda: self.update_status(f"Analysis complete for year {year}"))
         except Exception as e:
             if not self.is_running:
                 return
