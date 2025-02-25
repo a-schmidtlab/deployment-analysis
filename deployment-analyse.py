@@ -265,6 +265,9 @@ class DeploymentAnalyzer:
         if max_delay is not None:
             data = data[data['Verzögerung_Minuten'] <= max_delay]
         
+        # Ensure all hours are represented (0-23)
+        all_hours = list(range(24))
+        
         # Create pivot table based on granularity
         if granularity == "daily":
             # Pivot by day of month and hour
@@ -279,6 +282,9 @@ class DeploymentAnalyzer:
                 aggfunc='mean',
                 fill_value=0
             )
+            
+            # Ensure all hours are included
+            pivot = pivot.reindex(columns=all_hours, fill_value=0)
             
         elif granularity == "weekly":
             try:
@@ -308,16 +314,14 @@ class DeploymentAnalyzer:
                     values='Verzögerung_Minuten',
                     index='Weekday',
                     columns='Hour',
-    aggfunc='mean',
-    fill_value=0
-)
-
-                # Reorder the weekdays if they're in the right format
-                try:
-                    pivot = pivot.reindex(weekday_order)
-                except:
-                    # If reindexing fails, just use the pivot as is
-                    pass
+                    aggfunc='mean'
+                )
+                
+                # Ensure all weekdays and hours are included by reindexing
+                pivot = pivot.reindex(index=weekday_order, columns=all_hours)
+                
+                # Fill NaN values with 0 for values and use None (a different color) for missing data points
+                pivot = pivot.fillna(value=float('nan'))
             
             except Exception as e:
                 print(f"Error creating weekly pivot table: {str(e)}")
@@ -331,9 +335,12 @@ class DeploymentAnalyzer:
                         values='Verzögerung_Minuten',
                         index='Day',
                         columns='Hour',
-                        aggfunc='mean',
-                        fill_value=0
+                        aggfunc='mean'
                     )
+                    
+                    # Ensure all hours are included
+                    pivot = pivot.reindex(columns=all_hours)
+                    pivot = pivot.fillna(value=float('nan'))
                 except Exception as e2:
                     print(f"Failed to create fallback pivot: {str(e2)}")
                     return None
@@ -348,9 +355,15 @@ class DeploymentAnalyzer:
                 values='Verzögerung_Minuten',
                 index='Month',
                 columns='Hour',
-                aggfunc='mean',
-                fill_value=0
+                aggfunc='mean'
             )
+            
+            # Ensure all months (1-12) and hours are included
+            all_months = list(range(1, 13))
+            pivot = pivot.reindex(index=all_months, columns=all_hours)
+            
+            # Fill missing values with NaN to render as white/empty cells
+            pivot = pivot.fillna(value=float('nan'))
             
             # Map month numbers to month names
             month_names = {
@@ -373,9 +386,12 @@ class DeploymentAnalyzer:
                 values='Verzögerung_Minuten',
                 index='Date',
                 columns='Hour',
-                aggfunc='mean',
-                fill_value=0
+                aggfunc='mean'
             )
+            
+            # Ensure all hours are included
+            pivot = pivot.reindex(columns=all_hours)
+            pivot = pivot.fillna(value=float('nan'))
             
             # Format the date index to be more readable
             pivot.index = [d.strftime('%b %d') for d in pivot.index]
@@ -392,9 +408,12 @@ class DeploymentAnalyzer:
                 values='Verzögerung_Minuten',
                 index='All Data',
                 columns='Hour',
-                aggfunc='mean',
-                fill_value=0
+                aggfunc='mean'
             )
+            
+            # Ensure all hours are included
+            pivot = pivot.reindex(columns=all_hours)
+            pivot = pivot.fillna(value=float('nan'))
         
         self.pivot_table = pivot
         return pivot
@@ -429,7 +448,7 @@ class DeploymentAnalyzer:
             cols = len(self.pivot_table.columns)
             
             # Define standard dimensions for complete datasets to ensure consistent square sizes
-            standard_rows = {"monthly": 31, "weekly": 7, "yearly": rows, "daily": rows}
+            standard_rows = {"monthly": 12, "weekly": 7, "yearly": rows, "daily": rows}
             standard_cols = 24  # Hours in a day
             
             # Adjust figure size based on standard dimensions for consistent square sizes
@@ -439,27 +458,130 @@ class DeploymentAnalyzer:
                 adjusted_height = max(8, min(std_rows * 0.4, 16))
                 adjusted_width = max(10, min(standard_cols * 0.8, 20))
                 figsize = (adjusted_width, adjusted_height)
+            elif granularity == 'yearly':
+                # For yearly view, use a more balanced approach to sizing
+                # Aim for rectangles with 2:1 ratio (twice as wide as tall)
+                row_to_col_ratio = rows / cols
+                # Calculate width based on number of columns (hours) - increased for better screen usage
+                adjusted_width = max(16, min(cols * 0.8, 24))  # Increased width for wider rectangles
+                # Calculate height based on width and row-to-column ratio, but half as tall for 2:1 ratio
+                adjusted_height = max(6, min(adjusted_width * row_to_col_ratio * 0.35, 18))  # Adjusted ratio for 2:1 rectangles
+                
+                # Limit height for very large datasets to prevent excessive stretching
+                if rows > 40:
+                    adjusted_height = min(adjusted_height, 20)
+                    
+                figsize = (adjusted_width, adjusted_height)
 
             # Create new figure
             fig, ax = plt.subplots(figsize=figsize)
             
-            # Always set aspect ratio to 'equal' for weekly and monthly views to ensure square cells
+            # Set aspect ratio - for yearly view, use 2:1 rectangles instead of squares
             if granularity in ['weekly', 'monthly']:
+                # Use square cells for weekly and monthly views
                 ax.set_aspect('equal', adjustable='box', anchor='C')
+            elif granularity == 'yearly':
+                # For yearly view, use rectangles twice as wide as tall (2:1 ratio)
+                # We set aspect to 0.5 to make cells twice as wide as tall
+                ax.set_aspect(0.5, adjustable='box', anchor='C')
             
-            # Create heatmap
-            sns.heatmap(
+            # Create a masked array to handle NaN values properly
+            mask = np.isnan(self.pivot_table.values)  # Using .values to avoid Series truth value ambiguity
+            
+            # Custom colormap with white for NaN/missing values - using updated method to avoid deprecation warning
+            try:
+                # Modern matplotlib approach (3.7+)
+                cmap_with_white = matplotlib.colormaps[cmap].copy()
+            except (AttributeError, KeyError):
+                # Fallback for older versions
+                try:
+                    cmap_with_white = plt.get_cmap(cmap).copy()  # Use plt.get_cmap instead of plt.cm.get_cmap
+                except:
+                    # Last resort fallback
+                    cmap_with_white = plt.cm.get_cmap(cmap).copy()
+                    
+            cmap_with_white.set_bad('white', 1.0)  # Set NaN cells to white
+            
+            # Determine appropriate linewidth based on view type
+            if granularity == 'yearly' and rows > 20:
+                linewidth = 0.2  # Thinner lines for yearly view with many rows
+            else:
+                linewidth = 0.5
+            
+            # Compute vmin and vmax for adaptive color scaling
+            # If it's yearly view, we want to adapt the color scale to show more variation
+            vmin, vmax = None, None  # Default values
+            if granularity == 'yearly':
+                # Calculate quartile-based bounds to emphasize the variation in the middle of the data
+                # Get the data as numpy array to avoid Series truth value ambiguity
+                data_values = self.pivot_table.values
+                if not np.all(mask):  # Using numpy's all instead of mask.all()
+                    data_flat = data_values.flatten()
+                    data_flat = data_flat[~np.isnan(data_flat)]  # Filter out NaN values
+                    
+                    if len(data_flat) > 0:
+                        # For very low variation data, use percentiles closer to median
+                        data_std = np.std(data_flat)
+                        data_range = np.max(data_flat) - np.min(data_flat)
+                        
+                        # If data has low variation, use tighter percentiles to enhance contrast
+                        if data_range < 5 or data_std < 2:
+                            vmin = np.percentile(data_flat, 30)  # 30th percentile
+                            vmax = np.percentile(data_flat, 90)  # 90th percentile
+                        else:
+                            vmin = np.percentile(data_flat, 10)  # 10th percentile
+                            vmax = np.percentile(data_flat, 95)  # 95th percentile
+                            
+                        # Ensure vmin and vmax are not the same to prevent colormap issues
+                        if vmin == vmax:
+                            vmin = 0 if vmin == 0 else vmin * 0.9
+                            vmax = vmax * 1.1
+            
+            # Create heatmap with masked data - without annotations
+            heatmap = sns.heatmap(
                 self.pivot_table,
-                cmap=cmap,
-                annot=True,
-                fmt=".1f",
-                linewidths=.5,
+                cmap=cmap_with_white,
+                annot=False,  # No annotations as requested by user
+                linewidths=linewidth,
                 ax=ax,
-                cbar_kws={'label': 'Average Delay (minutes)'}
+                cbar_kws={'label': 'Average Delay (minutes)'},
+                mask=mask,  # Mask NaN values
+                vmin=vmin,  # Custom range for color scaling
+                vmax=vmax,
+                robust=True  # Use robust quantile-based scaling for color range
             )
             
-            # Adjust layout
-            plt.tight_layout()
+            # Optimize tick labels display based on the view type
+            if granularity == "yearly":
+                # Special handling for yearly view to make it more compact and readable
+                # Reduce font size for tick labels
+                plt.setp(ax.get_xticklabels(), fontsize=6, rotation=45, ha='right')
+                
+                # For yearly view with many rows, show fewer y-tick labels
+                if rows > 25:
+                    # Show approximately 20 tick labels (one every N rows)
+                    tick_step = max(1, rows // 20)
+                    visible_ticks = list(range(0, rows, tick_step))
+                    
+                    # Always include the first and last tick
+                    if visible_ticks and visible_ticks[-1] != rows - 1:
+                        visible_ticks.append(rows - 1)
+                    
+                    # Set visible y-ticks and format them
+                    y_ticks = ax.get_yticks()
+                    ax.set_yticks([y_ticks[i] for i in visible_ticks])
+                    ax.set_yticklabels([self.pivot_table.index[i] for i in visible_ticks], 
+                                       fontsize=6, rotation=0)
+                else:
+                    # For smaller datasets, just set the font size
+                    plt.setp(ax.get_yticklabels(), fontsize=6, rotation=0)
+            
+            # Adjust layout based on view type
+            if granularity == 'yearly' and rows > 25:
+                # More compact layout for large yearly views
+                plt.tight_layout(pad=1.2, h_pad=0.8, w_pad=0.8, rect=[0.03, 0.03, 0.97, 0.97])
+            else:
+                plt.tight_layout()
             
             # Switch back to the original backend
             matplotlib.use(default_backend)
@@ -591,7 +713,7 @@ class SimpleAnalysisGUI:
         self.analyzer = DeploymentAnalyzer()
         self.file_path = None
         self.current_figure = None
-        self.selected_granularity = tk.StringVar(value="monthly")
+        self.selected_granularity = tk.StringVar(value="yearly")
         self.canvas = None
         self.selected_month = None
         self.selected_year = None
@@ -635,11 +757,20 @@ class SimpleAnalysisGUI:
         self.control_panel = ttk.Frame(self.root)
         self.control_panel.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         
-        # Create center visualization frame (for heatmap)
+        # Create center visualization frame (for heatmap and navigation)
         self.visualization_frame = ttk.Frame(self.root)
         self.visualization_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
-        self.visualization_frame.grid_rowconfigure(0, weight=1)
+        self.visualization_frame.grid_rowconfigure(0, weight=1)  # Canvas row
+        self.visualization_frame.grid_rowconfigure(1, weight=0)  # Navigation row
         self.visualization_frame.grid_columnconfigure(0, weight=1)
+        
+        # Create canvas frame for the visualization
+        self.canvas_frame = ttk.Frame(self.visualization_frame)
+        self.canvas_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        
+        # Create navigation frame (for time period buttons) inside visualization frame
+        self.navigation_frame = ttk.Frame(self.visualization_frame)
+        self.navigation_frame.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
         
         # Create bottom navigation frame (for time period buttons)
         self.navigation_frame = ttk.Frame(self.root)
@@ -741,20 +872,17 @@ class SimpleAnalysisGUI:
         self.min_delay_label.pack(side="left", **padding)
         self.max_delay_label.pack(side="left", **padding)
         
-        # Run button - commented out to remove from GUI
-        # self.run_button.grid(row=0, column=2, sticky="e", **padding)
-        
         # VISUALIZATION FRAME LAYOUT -------------------------
         # Canvas - make it dominant by spanning the entire space
-        self.canvas_frame.pack(fill="both", expand=True, **padding)
+        self.canvas_frame.grid(row=0, column=0, sticky="nsew", **padding)
         
         # Status and progress at the bottom
-        self.status_frame.pack(fill="x", **padding)
+        self.status_frame.grid(row=1, column=0, sticky="ew", **padding)
         self.status_label.pack(side="left", **padding)
         self.progress.pack(side="right", fill="x", expand=True, **padding)
         
         # Export buttons
-        self.export_frame.pack(fill="x", **padding)
+        self.export_frame.grid(row=2, column=0, sticky="ew", **padding)
         self.export_img_button.pack(side="left", **padding)
         self.export_data_button.pack(side="left", **padding)
         
@@ -839,8 +967,8 @@ class SimpleAnalysisGUI:
                 
                 self.root.after(0, self.update_time_period_buttons)
                 
-                # Default to monthly granularity
-                granularity = "monthly"
+                # Default to yearly granularity instead of monthly
+                granularity = "yearly"
                 self.selected_granularity.set(granularity)
                 
                 # Create pivot table
@@ -1246,7 +1374,7 @@ class SimpleAnalysisGUI:
             cols = len(pivot_table.columns)
             
             # Define standard dimensions for complete datasets to ensure consistent square sizes
-            standard_rows = {"monthly": 31, "weekly": 7, "yearly": rows, "hourly": 1}
+            standard_rows = {"monthly": 12, "weekly": 7, "yearly": rows, "hourly": 1}
             standard_cols = 24  # Hours in a day
             
             # Use standard dimensions for calculating aspect ratio to ensure consistent square sizes
@@ -1256,6 +1384,18 @@ class SimpleAnalysisGUI:
                 # This ensures consistent square sizes regardless of dataset completeness
                 height = max(8, min(std_rows * 0.4, 16))
                 width = max(10, min(standard_cols * 0.8, 20))
+            elif current_granularity == 'yearly':
+                # For yearly view, use a more balanced approach to sizing
+                # Aim for rectangles with 2:1 ratio (twice as wide as tall)
+                row_to_col_ratio = rows / cols
+                # Calculate width based on number of columns (hours) - increased for better screen usage
+                width = max(16, min(cols * 0.8, 24))  # Increased width for wider rectangles
+                # Calculate height based on width and row-to-column ratio, but half as tall for 2:1 ratio
+                height = max(6, min(width * row_to_col_ratio * 0.35, 18))  # Adjusted ratio for 2:1 rectangles
+                
+                # Limit height for very large datasets to prevent excessive stretching
+                if rows > 40:
+                    height = min(height, 20)
             else:
                 # For other views, use the actual data dimensions
                 if rows > 20 or cols > 24:
@@ -1273,31 +1413,109 @@ class SimpleAnalysisGUI:
             # Create the figure with extra padding for title and labels
             fig, ax = plt.subplots(figsize=(width, height))
             
-            # Always set aspect ratio to 'equal' for weekly and monthly views to ensure square cells
+            # Set aspect ratio - for yearly view, use 2:1 rectangles instead of squares
             if current_granularity in ['weekly', 'monthly']:
+                # Use square cells for weekly and monthly views
                 ax.set_aspect('equal', adjustable='box', anchor='C')
+            elif current_granularity == 'yearly':
+                # For yearly view, use rectangles twice as wide as tall (2:1 ratio)
+                # We set aspect to 0.5 to make cells twice as wide as tall
+                ax.set_aspect(0.5, adjustable='box', anchor='C')
             
-            # Create the heatmap with a color map
-            sns.heatmap(
+            # Custom colormap with white for NaN/missing values - using updated method to avoid deprecation warning
+            try:
+                # Modern matplotlib approach (3.7+)
+                cmap = matplotlib.colormaps["RdYlGn_r"].copy()
+            except (AttributeError, KeyError):
+                # Fallback for older versions
+                try:
+                    cmap = plt.get_cmap("RdYlGn_r").copy()  # Use plt.get_cmap instead of plt.cm.get_cmap
+                except:
+                    # Last resort fallback
+                    cmap = plt.cm.get_cmap("RdYlGn_r").copy()
+                    
+            cmap.set_bad('white', 1.0)  # Set NaN cells to white
+            
+            # Create a mask for NaN values
+            mask = np.isnan(pivot_table.values)  # Using .values to avoid Series truth value ambiguity
+            
+            # Determine appropriate linewidth based on view type
+            if current_granularity == 'yearly' and rows > 20:
+                linewidth = 0.2  # Thinner lines for yearly view with many rows
+            else:
+                linewidth = 0.5
+            
+            # Compute vmin and vmax for adaptive color scaling
+            # If it's yearly view, we want to adapt the color scale to show more variation
+            vmin, vmax = None, None  # Default values
+            if current_granularity == 'yearly':
+                # Calculate quartile-based bounds to emphasize the variation in the middle of the data
+                # Get the data as numpy array to avoid Series truth value ambiguity
+                data_values = pivot_table.values
+                if not np.all(mask):  # Using numpy's all instead of mask.all()
+                    data_flat = data_values.flatten()
+                    data_flat = data_flat[~np.isnan(data_flat)]  # Filter out NaN values
+                    
+                    if len(data_flat) > 0:
+                        # For very low variation data, use percentiles closer to median
+                        data_std = np.std(data_flat)
+                        data_range = np.max(data_flat) - np.min(data_flat)
+                        
+                        # If data has low variation, use tighter percentiles to enhance contrast
+                        if data_range < 5 or data_std < 2:
+                            vmin = np.percentile(data_flat, 30)  # 30th percentile
+                            vmax = np.percentile(data_flat, 90)  # 90th percentile
+                        else:
+                            vmin = np.percentile(data_flat, 10)  # 10th percentile
+                            vmax = np.percentile(data_flat, 95)  # 95th percentile
+                            
+                        # Ensure vmin and vmax are not the same to prevent colormap issues
+                        if vmin == vmax:
+                            vmin = 0 if vmin == 0 else vmin * 0.9
+                            vmax = vmax * 1.1
+            
+            # Create the heatmap with a color map - without annotations
+            heatmap = sns.heatmap(
                 pivot_table, 
-                cmap="RdYlGn_r", 
-                linewidths=0.5, 
-                ax=ax, 
-                cbar_kws={'label': 'Delay (minutes)'},
-                robust=True  # Makes the colormap robust to outliers
+                cmap=cmap,
+                linewidths=linewidth,
+                annot=False,  # No annotations as requested by user
+                cbar_kws={'label': 'Average Delay (minutes)'},
+                mask=mask,  # Mask NaN values
+                vmin=vmin,  # Custom range for color scaling
+                vmax=vmax,
+                robust=True  # Use robust quantile-based scaling for color range
             )
             
             # Set titles and labels
             current_granularity = self.selected_granularity.get()
             title = f"Deployment Delays"
             
-            # Set smaller font size for tick labels in year view to make dates fit better
+            # Optimize tick labels display based on the view type
             if current_granularity == "yearly":
-                # Reduce font size for both x and y tick labels
+                # Special handling for yearly view to make it more compact and readable
+                # Reduce font size for tick labels
                 plt.setp(ax.get_xticklabels(), fontsize=6, rotation=45, ha='right')
-                plt.setp(ax.get_yticklabels(), fontsize=6)
-                # Rotate y-axis tick labels to fit better
-                plt.setp(ax.get_yticklabels(), rotation=0)
+                
+                # For yearly view with many rows, show fewer y-tick labels
+                if rows > 25:
+                    # Show approximately 20 tick labels (one every N rows)
+                    tick_step = max(1, rows // 20)
+                    visible_ticks = list(range(0, rows, tick_step))
+                    
+                    # Always include the first and last tick
+                    if visible_ticks and visible_ticks[-1] != rows - 1:
+                        visible_ticks.append(rows - 1)
+                    
+                    # Set visible y-ticks and format them
+                    y_ticks = ax.get_yticks()
+                    ax.set_yticks([y_ticks[i] for i in visible_ticks])
+                    ax.set_yticklabels([pivot_table.index[i] for i in visible_ticks], 
+                                        fontsize=6, rotation=0)
+                else:
+                    # For smaller datasets, just set the font size
+                    plt.setp(ax.get_yticklabels(), fontsize=6, rotation=0)
+                
                 subtitle = f"Yearly View for {self.selected_year} (Date × Hour)"
             elif current_granularity == "monthly":
                 subtitle = "Monthly View (Day × Hour)"
@@ -1310,8 +1528,11 @@ class SimpleAnalysisGUI:
             title_fontsize = 14 if (rows <= 20 and cols <= 24) else 12
             ax.set_title(f"{title}\n{subtitle}", fontsize=title_fontsize, pad=10)
             
-            # Adjust layout with explicit padding for large heatmaps
-            if rows > 20 or cols > 24:
+            # Adjust layout based on view type
+            if current_granularity == 'yearly' and rows > 25:
+                # More compact layout for large yearly views
+                plt.tight_layout(pad=1.2, h_pad=0.8, w_pad=0.8, rect=[0.03, 0.03, 0.97, 0.97])
+            elif rows > 20 or cols > 24:
                 plt.tight_layout(pad=1.5, h_pad=1.0, w_pad=1.0, rect=[0.05, 0.05, 0.95, 0.95])
             else:
                 plt.tight_layout()
@@ -1469,7 +1690,7 @@ class SimpleAnalysisGUI:
         
         self.selected_month = month
         self.selected_year = year
-        self.selected_granularity.set("monthly")
+        self.selected_granularity.set("yearly")
         
         # Update UI to reflect selection
         self.update_status(f"Selecting data for month {month}, year {year}", progress=True)
@@ -1521,7 +1742,7 @@ class SimpleAnalysisGUI:
             if pivot_table is not None and not pivot_table.empty:
                 # Store the pivot table for the main thread to use
                 self.current_pivot_table = pivot_table
-                self.current_granularity = "monthly"
+                self.current_granularity = "yearly"
                 
                 # Use the main thread to create and display the heatmap
                 self.root.after(0, self._create_heatmap_main_thread)
