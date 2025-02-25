@@ -1,4 +1,4 @@
-# Bild-Auslieferungsanalyse-Tool 📊
+# Bild-Auslieferungsanalyse-Tool 
 
 *[English version below](#image-deployment-analysis-tool-)*
 
