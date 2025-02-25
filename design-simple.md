@@ -63,3 +63,64 @@ Entwicklung eines Analysesystems, das Verarbeitungszeiten visualisiert. Das Syst
    - Installations-Anleitung
    - Benutzerhandbuch
    - Technische Dokumentation
+
+## Datenanalyse-Ergebnisse
+
+### CSV-Dateistruktur
+- Dateiformat: CSV mit Semikolon-Trennung
+- Zeichenkodierung: vermutlich UTF-8
+- Spalten:
+  * IPTC_DE Anweisung (Zeitstempel + Rights Management)
+  * IPTC_EN Anweisung (English equivalent)
+  * Bild Upload Zeitpunkt (Timestamp format: DD.MM.YYYY HH:mm:ss)
+  * Bild Veröffentlicht (Boolean: Ja/Nein)
+  * Bild Aktivierungszeitpunkt (Timestamp format: DD.MM.YYYY HH:mm:ss)
+
+### Erkenntnisse
+1. **Zeitstempel-Formate**
+   - IPTC Anweisungen enthalten Zeitstempel in [HH:mm:ss] Format
+   - Upload und Aktivierung verwenden DD.MM.YYYY HH:mm:ss Format
+   - Standardisierung der Zeitstempel wird für die Analyse benötigt
+
+2. **Verarbeitungszeit-Berechnung**
+   - Verzögerung kann berechnet werden aus:
+     * Delta zwischen IPTC Zeitstempel und Upload-Zeit
+     * Delta zwischen Upload und Aktivierung
+   - Mehrere Ereignisse können in der gleichen Sekunde auftreten
+
+3. **Datenkonsistenz**
+   - Zweisprachige IPTC-Anweisungen (DE/EN)
+   - Rights Management Info ist in Anweisungen integriert
+   - Aktivierungs- und Upload-Zeitpunkte scheinen oft identisch
+
+### Empfehlungen für die Implementierung
+
+1. **Datenverarbeitung**
+   - Parser muss robust gegen verschiedene Zeitstempel-Formate sein
+   - Extraktion der Rights-Information aus IPTC-Anweisungen
+   - Deduplizierung bei identischen Zeitstempeln
+   - Normalisierung aller Zeitstempel auf einheitliches Format
+
+2. **Analyse-Funktionen**
+   - Gruppierung nach Minuten/Stunden für bessere Übersicht
+   - Berechnung von:
+     * Durchschnittliche Verarbeitungszeit
+     * Verzögerungen zwischen Anweisung und Upload
+     * Verzögerungen zwischen Upload und Aktivierung
+   - Erkennung von Verarbeitungsspitzen
+
+3. **Visualisierung**
+   - Zeitreihen mit verschiedenen Granularitäten
+   - Farbkodierung für verschiedene Verarbeitungszeiten
+   - Separate Ansichten für:
+     * Upload-Verzögerungen
+     * Aktivierungs-Verzögerungen
+     * Gesamtverarbeitungszeit
+
+4. **Datenbankschema**
+   - Normalisierte Speicherung der Zeitstempel
+   - Separate Tabellen für:
+     * IPTC-Anweisungen
+     * Verarbeitungsereignisse
+     * Rights Management
+   - Indizierung für schnelle Zeitbereichsabfragen
