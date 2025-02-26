@@ -29,6 +29,16 @@ echo Python version: %PYTHON_VER%
 :: Ensure we copy Python DLLs
 set PYTHON_DLL_DIR=%PYTHON_PREFIX%
 
+:: Create a PyInstaller exclude pattern file
+echo Creating exclusion patterns file...
+echo # Exclude large CSV data files > exclude_patterns.txt
+echo *Editorial_Importzeit*.csv >> exclude_patterns.txt
+echo *\raw\*.csv >> exclude_patterns.txt
+echo *\*tests\* >> exclude_patterns.txt
+echo *\*test\* >> exclude_patterns.txt
+echo *\*sample_data\* >> exclude_patterns.txt
+echo *__pycache__* >> exclude_patterns.txt
+
 echo Running PyInstaller...
 pyinstaller ^
     --workpath="%WORK_PATH%" ^
@@ -45,6 +55,15 @@ pyinstaller ^
     --hidden-import=tkinter ^
     --hidden-import=PIL ^
     --add-data "data;data" ^
+    --exclude-module tests ^
+    --exclude-module test ^
+    --exclude-module testing ^
+    --exclude "*.pdb" ^
+    --exclude "*/test/*" ^
+    --exclude "*/tests/*" ^
+    --exclude "*/testing/*" ^
+    --exclude "*Editorial_Importzeit*.csv" ^
+    --exclude-module sample_data ^
     --add-data "logs;logs" ^
     --add-data "output;output" ^
     --add-data "deployment-analyse.py;." ^
@@ -88,6 +107,15 @@ if %ERRORLEVEL% NEQ 0 (
     echo. >> "dist\DeploymentAnalyzer\app_config.ini"
     echo [Options] >> "dist\DeploymentAnalyzer\app_config.ini"
     echo DefaultGUIMode=True >> "dist\DeploymentAnalyzer\app_config.ini"
+    
+    echo Post-build cleanup - removing large CSV files and test directories...
+    del /s /q "dist\DeploymentAnalyzer\support\_internal\data\raw\Editorial_Importzeit*.csv" 2>nul
+    for /d /r "dist\DeploymentAnalyzer\support\_internal" %%d in (test tests testing sample_data) do (
+        if exist "%%d" (
+            echo Removing %%d
+            rmdir /s /q "%%d" 2>nul
+        )
+    )
     
     echo Creating user-friendly launchers...
     echo @echo off > "dist\DeploymentAnalyzer\Deployment Analyzer.bat"
@@ -147,6 +175,9 @@ if %ERRORLEVEL% NEQ 0 (
     copy "%WINDIR%\System32\vcruntime140.dll" "dist\DeploymentAnalyzer\" 2>nul
     copy "%WINDIR%\System32\vcruntime140_1.dll" "dist\DeploymentAnalyzer\" 2>nul
 )
+
+echo Cleaning up temporary files...
+if exist exclude_patterns.txt del exclude_patterns.txt
 
 echo Done.
 echo.

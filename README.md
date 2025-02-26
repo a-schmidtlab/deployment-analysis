@@ -4,62 +4,86 @@ A tool for analyzing deployment data with visualization capabilities.
 
 ## Introduction
 
-The Deployment Analyzer is a tool designed to help analyze deployment data, generate heatmaps, and export visualizations. It provides both a command-line interface and a graphical user interface for interactive analysis.
+The Deployment Analyzer is a tool designed to help analyze and visualize deployment data. It provides both a command-line interface and a graphical user interface for importing data, performing analysis, and generating reports.
 
 ## Installation
 
-### Using the Standalone Executable
+### Pre-built Binary (Recommended)
 
-1. Navigate to the `dist/DeploymentAnalyzer` directory
-2. You have several options to run the application:
-   - Double-click on `Deployment Analyzer.bat` (recommended for most users)
-   - Use the Windows shortcut `Deployment Analyzer.lnk`
-   - Run `DeploymentAnalyzer.exe` directly (now defaults to GUI mode)
+1. Download the latest release package
+2. Extract the ZIP file to a directory of your choice
+3. Run `DeploymentAnalyzer.bat` to start the application
 
-No additional installation steps are required as all dependencies are bundled within the executable.
+### From Source
+
+1. Ensure Python 3.9 or higher is installed
+2. Clone this repository
+3. Install required packages: `pip install -r requirements.txt`
+4. Run `python launcher.py` to start the application
 
 ## Features
 
-- Import deployment data from CSV files
-- Generate heatmaps and visualizations
-- Export data and visualizations
-- Customize analysis parameters
-- Both GUI and command-line modes
+- Data import from CSV, Excel, and multiple other formats
+- Advanced data filtering and transformation
+- Interactive data visualization
+- Export results to various formats (CSV, Excel, PDF)
+- Comprehensive reporting capabilities
+- Batch processing for multiple data sets
 
 ## Usage
 
 ### GUI Mode
 
-1. Launch the application using one of the methods described in the Installation section
-2. Use the interface to load data, configure settings, and analyze your deployment data
-3. Export results using the export functions in the application
+1. Start the application by running `DeploymentAnalyzer.bat`
+2. Use the file menu to import your data
+3. Select analysis options from the toolbar
+4. Generate visualizations using the chart buttons
+5. Export results using the export menu
 
-### Command Line Mode
+### Command-line Mode
 
-Launch the application with parameters:
+For batch processing or automation, use the command-line interface:
 
 ```
-DeploymentAnalyzer.exe --input path/to/input.csv --output path/to/output
+python deployment-analyse.py --input data/input.csv --output output/results.xlsx
 ```
+
+Use `--help` to see all available command-line options.
+
+## Disk Space Requirements
+
+The application requires approximately 350 MB of disk space when installed. This optimized size was achieved by:
+
+- Excluding large sample CSV files
+- Removing test directories from libraries
+- Eliminating unnecessary sample data and documentation
+
+If you're building from source, the build scripts automatically handle these optimizations.
 
 ## Troubleshooting
 
-If you encounter any issues:
+If the application doesn't start:
 
 1. Check the log files in the `logs` directory
-2. Make sure all required data directories exist (`data`, `logs`, `output`)
-3. Ensure your input data is properly formatted
+2. Ensure all required dependencies are installed
+3. Verify that you have the necessary permissions to access the data directory
+
+If you encounter specific errors, please check the `DEPLOYMENT.md` file for detailed troubleshooting steps.
 
 ## Directory Structure
 
-- `data/`: Contains reference data
-- `logs/`: Application logs
-- `output/`: Default location for exported files
+```
+DeploymentAnalyzer/
+├── data/           # Data files and templates
+├── logs/           # Log files
+├── output/         # Generated reports and output files
+└── .app/           # Application files (hidden)
+```
 
 ## License
 
-This software is proprietary and confidential.
+This software is licensed under the MIT License. See the LICENSE file for details.
 
-## Contact
+## Support
 
-For support or questions, please contact the author.
+For support, please open an issue on our issue tracker or contact support@example.com.
