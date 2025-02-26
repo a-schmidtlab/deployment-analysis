@@ -1,6 +1,9 @@
 # Deployment Analyzer
 
 A tool for analyzing deployment data with visualization capabilities.
+(c) 2025 by Axel Schmidt
+
+
 
 ## Introduction
 
@@ -12,7 +15,7 @@ The Deployment Analyzer is a tool designed to help analyze and visualize deploym
 
 1. Download the latest release package
 2. Extract the ZIP file to a directory of your choice
-3. Run `DeploymentAnalyzer.bat` to start the application
+3. Run `DeploymentAnalyzer.exe` to start the application
 
 ### From Source
 
