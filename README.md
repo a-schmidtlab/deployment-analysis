@@ -89,4 +89,4 @@ This software is licensed under the MIT License. See the LICENSE file for detail
 
 ## Support
 
-For support, please open an issue on our issue tracker or contact support@example.com.
+For support, please open an issue on our issue tracker or contact Axel Schmidt.
