@@ -1,0 +1,33 @@
+188 INFO: PyInstaller: 6.12.0, contrib hooks: 2025.1
+188 INFO: Python: 3.13.2
+223 INFO: Platform: Windows-11-10.0.26100-SP0
+223 INFO: Python environment: C:\Users\axels\AppData\Local\Programs\Python\Python313
+224 INFO: wrote C:\Users\axels\SynologyDrive\EIGENE_DATEIEN\Axels_Programme\deployment-analysis-1\DeploymentAnalyzer.spec
+227 INFO: Module search paths (PYTHONPATH):
+['C:\\Users\\axels\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\pyinstaller.exe',
+ 'C:\\Users\\axels\\AppData\\Local\\Programs\\Python\\Python313\\python313.zip',
+ 'C:\\Users\\axels\\AppData\\Local\\Programs\\Python\\Python313\\DLLs',
+ 'C:\\Users\\axels\\AppData\\Local\\Programs\\Python\\Python313\\Lib',
+ 'C:\\Users\\axels\\AppData\\Local\\Programs\\Python\\Python313',
+ 'C:\\Users\\axels\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages',
+ 'C:\\Users\\axels\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\setuptools\\_vendor',
+ 'C:\\Users\\axels\\SynologyDrive\\EIGENE_DATEIEN\\Axels_Programme\\deployment-analysis-1']
+712 INFO: Appending 'datas' from .spec
+713 INFO: checking Analysis
+778 INFO: checking PYZ
+842 INFO: checking PKG
+842 INFO: Building PKG because PKG-00.toc is non existent
+842 INFO: Building PKG (CArchive) DeploymentAnalyzer.pkg
+38700 INFO: Building PKG (CArchive) DeploymentAnalyzer.pkg completed successfully.
+38728 INFO: Bootloader C:\Users\axels\AppData\Local\Programs\Python\Python313\Lib\site-packages\PyInstaller\bootloader\Windows-64bit-intel\runw.exe
+38728 INFO: checking EXE
+38728 INFO: Building EXE because EXE-00.toc is non existent
+38728 INFO: Building EXE from EXE-00.toc
+38728 INFO: Copying bootloader EXE to C:\Users\axels\SynologyDrive\EIGENE_DATEIEN\Axels_Programme\deployment-analysis-1\dist\DeploymentAnalyzer.exe
+38879 INFO: Copying icon to EXE
+38975 INFO: Copying 0 resources to EXE
+38976 INFO: Embedding manifest in EXE
+39060 INFO: Appending PKG archive to EXE
+39159 INFO: Fixing EXE headers
+39655 INFO: Building EXE from EXE-00.toc completed successfully.
+39681 INFO: Build complete! The results are available in: C:\Users\axels\SynologyDrive\EIGENE_DATEIEN\Axels_Programme\deployment-analysis-1\dist

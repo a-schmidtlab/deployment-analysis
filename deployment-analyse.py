@@ -7,6 +7,8 @@ Simple Image Deployment Analysis Tool
 A simplified GUI application for analyzing image deployment delays.
 This tool allows importing Excel/CSV files and visualizing processing delays
 with options to customize the analysis and dive deeper when needed.
+.
+(c) 2025 by Axel Schmidt
 """
 
 import pandas as pd
@@ -16,6 +18,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from datetime import datetime, timedelta
 import locale
 import os
+import sys  # Added missing sys import
 import argparse
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
@@ -27,24 +30,142 @@ import matplotlib
 import csv
 import logging
 from logging.handlers import RotatingFileHandler
+import traceback
+import configparser  # Added for config file reading
+
+# Check for configuration file
+def load_config():
+    """Load application configuration from app_config.ini if available"""
+    config = configparser.ConfigParser()
+    config_paths = []
+    
+    if getattr(sys, 'frozen', False):
+        # Running as compiled exe
+        app_dir = os.path.dirname(sys.executable)
+        config_paths.append(os.path.join(app_dir, 'app_config.ini'))
+    else:
+        # Running in development
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+        config_paths.append(os.path.join(app_dir, 'app_config.ini'))
+    
+    # Try to load config from possible locations
+    config_loaded = False
+    config_file_used = None
+    
+    for config_path in config_paths:
+        if os.path.exists(config_path):
+            try:
+                config.read(config_path)
+                config_loaded = True
+                config_file_used = config_path
+                print(f"Loaded configuration from: {config_path}")
+                break
+            except Exception as e:
+                print(f"Error loading config from {config_path}: {e}")
+    
+    if not config_loaded:
+        print("No configuration file found, using defaults")
+        
+    return config, config_loaded, config_file_used
+
+# Load configuration
+app_config, config_loaded, config_file_used = load_config()
+
+# Print initial startup status - helpful for debugging
+print("Application starting...")
+print(f"Current working directory: {os.getcwd()}")
+print(f"Is frozen (PyInstaller): {'_MEIPASS' in dir(sys)}")
+
+# Helper function for PyInstaller bundled resources
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        if getattr(sys, 'frozen', False):
+            # Running as compiled exe
+            base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+            print(f"Using PyInstaller base path: {base_path}")
+        else:
+            # Running in normal Python environment
+            base_path = os.path.dirname(os.path.abspath(__file__))
+            print(f"Using script directory as base path: {base_path}")
+        
+        return os.path.join(base_path, relative_path)
+    except Exception as e:
+        print(f"Error in resource_path for {relative_path}: {str(e)}")
+        traceback.print_exc()
+        return relative_path
+
+# Define log directories based on environment
+def get_writable_dir(dirname):
+    """Returns a writable directory path that works both in development and when frozen"""
+    # Check if we have a path override in the config
+    if config_loaded and 'Paths' in app_config and f"{dirname}Dir" in app_config['Paths']:
+        # If running as exe, use the directory specified in the config
+        if getattr(sys, 'frozen', False):
+            app_dir = os.path.dirname(sys.executable)
+            config_path = app_config['Paths'][f"{dirname}Dir"]
+            # If path is relative, make it relative to the executable
+            if not os.path.isabs(config_path):
+                target_dir = os.path.join(app_dir, config_path)
+            else:
+                target_dir = config_path
+            print(f"Using configured {dirname} directory: {target_dir}")
+            return target_dir
+    
+    # Default behavior if no config or not frozen
+    if getattr(sys, 'frozen', False):
+        # If running as exe, use a directory next to the executable
+        app_dir = os.path.dirname(sys.executable)
+        target_dir = os.path.join(app_dir, dirname)
+    else:
+        # In development, use local directory
+        target_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), dirname)
+    
+    print(f"Using default {dirname} directory: {target_dir}")
+    return target_dir
+
+# Create necessary directories 
+try:
+    logs_dir = get_writable_dir('logs')
+    data_dir = get_writable_dir('data')
+    output_dir = get_writable_dir('output')
+    
+    os.makedirs(logs_dir, exist_ok=True)
+    os.makedirs(data_dir, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
+    
+    print(f"Created directories: logs, data, output")
+except Exception as e:
+    print(f"Error creating directories: {str(e)}")
+    traceback.print_exc()
 
 # Set up logging
-os.makedirs('logs', exist_ok=True)
-log_file = os.path.join('logs', 'deployment_analysis.log')
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=2)
-    ]
-)
-logger = logging.getLogger(__name__)
-logger.info("Logging system initialized")
+try:
+    log_file = os.path.join(logs_dir, 'deployment_analysis.log')
+    print(f"Log file path: {log_file}")
+    
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
+        handlers=[
+            logging.StreamHandler(),
+            RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=2)
+        ]
+    )
+    logger = logging.getLogger(__name__)
+    logger.info("Logging system initialized")
+except Exception as e:
+    print(f"Error setting up logging: {str(e)}")
+    traceback.print_exc()
 
-# Set backend to TkAgg for GUI applications
-matplotlib.use('TkAgg')
-logger.info(f"Using {matplotlib.get_backend()} backend for matplotlib")
+try:
+    # Set backend to TkAgg for GUI applications
+    matplotlib.use('TkAgg')
+    logger.info(f"Using {matplotlib.get_backend()} backend for matplotlib")
+except Exception as e:
+    print(f"Error setting matplotlib backend: {str(e)}")
+    traceback.print_exc()
 
 # Configure locale for German weekday names
 try:
@@ -2502,7 +2623,20 @@ def parse_arguments():
     parser.add_argument("--gui", action="store_true", help="Start with the GUI interface")
     parser.add_argument("--max-delay", type=float, help="Maximum delay to include (in minutes)")
     
-    return parser.parse_args()
+    args = parser.parse_args()
+    
+    # If no arguments were provided at all, default to GUI mode
+    if len(sys.argv) == 1:
+        args.gui = True
+    
+    # Check if the config specifies default GUI mode
+    if config_loaded and 'Options' in app_config and 'DefaultGUIMode' in app_config['Options']:
+        default_gui = app_config['Options']['DefaultGUIMode'].lower() in ('true', 'yes', '1')
+        if default_gui and not any(arg in sys.argv for arg in ('--file', '--output', '--max-delay')):
+            print("Using DefaultGUIMode=True from config file")
+            args.gui = True
+    
+    return args
 
 def run_command_line(args):
     """Run the tool in command-line mode."""
@@ -2567,21 +2701,33 @@ def run_command_line(args):
 
 def main():
     """Main entry point for the application."""
-    args = parse_arguments()
+    print("Entering main function")
     
     try:
+        args = parse_arguments()
+        
+        print(f"Command-line arguments: {args}")
+        
         if args.gui:
             # Start the GUI
+            print("Starting GUI mode")
             root = tk.Tk()
             
             # Set exception handler for unhandled exceptions
             def handle_exception(exc_type, exc_value, exc_traceback):
-                import traceback
                 print("Unhandled exception:")
                 traceback.print_exception(exc_type, exc_value, exc_traceback)
+                # Save error to a file in case GUI is not visible
+                try:
+                    with open(os.path.join(logs_dir, 'error.log'), 'a') as f:
+                        f.write(f"\n--- Exception at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+                        traceback.print_exception(exc_type, exc_value, exc_traceback, file=f)
+                except:
+                    pass  # If we can't write to the file, just continue
+                
                 messagebox.showerror(
                     "Unhandled Exception",
-                    f"An unexpected error occurred: {exc_value}\n\nSee console for details."
+                    f"An unexpected error occurred: {exc_value}\n\nSee logs for details."
                 )
             
             # Set up exception handling
@@ -2597,20 +2743,50 @@ def main():
                     app.path_var.set(args.file)
                     root.after(100, app.run_analysis)  # Run after UI is fully initialized
                     
+                print("Starting Tkinter main loop")
                 root.mainloop()
+                print("Tkinter main loop ended")
             except Exception as e:
-                messagebox.showerror("Application Error", f"Error starting the application: {str(e)}")
-                print(f"Error starting GUI: {str(e)}")
-                import traceback
+                error_message = f"Error starting the application: {str(e)}"
+                print(error_message)
+                # Save error to a file
+                try:
+                    with open(os.path.join(logs_dir, 'gui_error.log'), 'a') as f:
+                        f.write(f"\n--- GUI Error at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+                        f.write(error_message + "\n")
+                        traceback.print_exc(file=f)
+                except:
+                    pass  # If we can't write to the file, just continue
+                
+                messagebox.showerror("Application Error", error_message)
                 traceback.print_exc()
-                root.destroy()
+                try:
+                    root.destroy()
+                except:
+                    pass
         else:
             # Run in command-line mode
+            print("Starting command-line mode")
             run_command_line(args)
     except Exception as e:
-        print(f"Fatal error: {str(e)}")
-        import traceback
+        error_message = f"Fatal error: {str(e)}"
+        print(error_message)
+        # Save error to a file
+        try:
+            with open(os.path.join(logs_dir, 'fatal_error.log'), 'a') as f:
+                f.write(f"\n--- Fatal Error at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+                f.write(error_message + "\n")
+                traceback.print_exc(file=f)
+        except:
+            pass  # If we can't write to the file, just continue
+        
         traceback.print_exc()
+        
+        # Try to show a message box if possible
+        try:
+            messagebox.showerror("Fatal Error", error_message)
+        except:
+            pass
 
 if __name__ == "__main__":
     main()
