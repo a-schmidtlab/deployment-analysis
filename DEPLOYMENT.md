@@ -48,6 +48,25 @@ This creates a distribution in `dist\DeploymentAnalyzer-Release` with the follow
 - All application files hidden in the `.app` folder
 - Proper configuration and directory structure
 
+### Step 4: Optimizing Build Size (Important)
+
+The build scripts now automatically exclude large CSV data files and test directories to minimize distribution size:
+
+- Large sample CSV files (like `Editorial_Importzeit*.csv`) are excluded
+- Test directories and files are excluded
+- Sample data directories are excluded
+
+If you need to add more exclusions, edit one of these files:
+- `enhanced_build.bat`: Contains exclusion patterns for PyInstaller command line
+- `DeploymentAnalyzer.spec`: Contains exclusion patterns for spec-based builds
+
+To further optimize size after building, you can run the executable update script:
+
+```cmd
+# Updates an existing release to clean up unnecessary files
+.\update_release_with_exe.bat
+```
+
 ## Running the Application
 
 ### Method 1: Run the Clean Distribution (Recommended)
@@ -146,6 +165,14 @@ DeploymentAnalyzer/
      ```
    - This explicitly includes Python and Visual C++ runtime DLLs
 
+5. **Large Distribution Size**:
+   - The build now automatically excludes large CSV files and test directories
+   - If the distribution is still too large, consider removing more files using the patterns in `enhanced_build.bat`
+   - You can run a post-build cleanup using PowerShell:
+     ```powershell
+     Get-ChildItem -Path "dist\DeploymentAnalyzer-Release" -Recurse -Force -Include *.csv | Remove-Item -Force
+     ```
+
 ## Distributing the Application
 
 1. **Clean Distribution (Recommended)**:
@@ -170,10 +197,30 @@ DeploymentAnalyzer/
 The project includes several scripts to create different distribution variants:
 
 - `build.bat` - Standard PyInstaller build
-- `enhanced_build.bat` - Enhanced build with explicit DLL inclusion
+- `enhanced_build.bat` - Enhanced build with explicit DLL inclusion and CSV exclusion
 - `create_final_release.bat` - Creates the clean distribution
 - `reorganize_dist.bat` - Reorganizes standard distribution with lib/support folders
 - `create_minimal_distribution.bat` - Creates a minimal distribution variant
+- `update_release_with_exe.bat` - Updates an existing release with an EXE launcher and cleans up unnecessary files
+
+## Optimizing Distribution Size
+
+The distribution size has been optimized by:
+
+1. **Excluding test files and directories**:
+   - All test directories from libraries are excluded
+   - This saves approximately 21 MB
+
+2. **Excluding large sample data CSV files**:
+   - Files like `Editorial_Importzeit*.csv` are excluded
+   - This can save hundreds of MB depending on the size of your data files
+
+3. **Excluding other unnecessary components**:
+   - Sample data directories from libraries
+   - Documentation files that aren't needed for runtime
+   - Debug symbols and compile artifacts
+
+To verify the exclusion worked, check the final distribution size - it should be approximately 330-350 MB (down from 600+ MB).
 
 ## Testing Deployment
 
