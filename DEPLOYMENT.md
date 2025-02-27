@@ -1,5 +1,47 @@
 # Deployment Guide
 
+## Version Control and Management
+
+This application follows [Semantic Versioning](https://semver.org/) (SemVer), using version numbers in the format of `MAJOR.MINOR.PATCH`:
+
+- **MAJOR**: Incremented for incompatible API changes
+- **MINOR**: Incremented for new functionality (backward-compatible)
+- **PATCH**: Incremented for bug fixes (backward-compatible)
+
+### Versioning Files and Structure
+
+The version is centrally managed in the `version.py` file and is automatically incorporated into:
+
+1. The application title/headline
+2. The deployment folder names (`DeploymentAnalyzer-{VERSION}-Release`)
+3. Documentation and README files
+4. Internal configuration files
+
+### How to Update the Version
+
+When releasing a new version, follow these steps:
+
+1. Update the version in the `version.py` file:
+   ```python
+   # Example for a bug fix release
+   VERSION_MAJOR = 1    # Only change for major, breaking changes
+   VERSION_MINOR = 1    # Change when adding new features
+   VERSION_PATCH = 1    # Change for bug fixes (was 0 in previous version)
+   
+   # Also update the date
+   VERSION_DATE = "2024-03-01"  # Update with each release
+   ```
+
+2. Run the build and deployment scripts which will automatically pick up the new version.
+
+The deployment scripts will extract the version information from the `version.py` file and incorporate it into all relevant files and folder names.
+
+### Checking Version Information
+
+- In the application UI: The version appears in the application title
+- In the deployment: The folder name includes the full version
+- In logs: Version information is included with logs for easier debugging
+
 This document provides detailed instructions for building and deploying the Deployment Analyzer application.
 
 ## Quick Start Guide for Continuous Deployment
@@ -450,6 +492,118 @@ copy "dist\DeploymentAnalyzer-Release\DeploymentAnalyzer.vbs" "dist\DeploymentAn
    # Create a zip archive
    Compress-Archive -Path .\dist\DeploymentAnalyzer-Release -DestinationPath .\dist\DeploymentAnalyzer-Release.zip -Force
    ```
+
+## Creating Executable Launchers
+
+When building the release, you may encounter issues with creating proper executable launchers if the C# compiler (`csc.exe`) is not available on your system. This section provides several methods to ensure you can create a valid .exe file for the release.
+
+### Method 1: Using the Automated PowerShell Script (Recommended)
+
+An enhanced PowerShell script is provided that tries multiple methods to create a proper executable:
+
+```powershell
+# Run the EXE creator script
+powershell -ExecutionPolicy Bypass -File create_exe.ps1
+```
+
+This script will:
+1. Try to find the C# compiler in PATH
+2. Try multiple .NET Framework compiler locations
+3. Try .NET Core/5+ compiler if available
+4. Fall back to creating a basic executable that points to the VBS script
+
+The script automatically detects the current version from `version.py` and creates the executable in the correct release folder.
+
+### Method 2: Using .NET Framework Compiler Directly
+
+If you know the location of your .NET Framework installation:
+
+```powershell
+# Create C# source file
+@"
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Windows.Forms;
+
+class Program
+{
+    static void Main()
+    {
+        try
+        {
+            string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+            string directory = Path.GetDirectoryName(exePath);
+            string vbsPath = Path.Combine(directory, "DeploymentAnalyzer.vbs");
+
+            if (!File.Exists(vbsPath))
+            {
+                MessageBox.Show("Error: Required files not found.\n\n" +
+                    "The DeploymentAnalyzer.vbs script must exist in the same location as this executable.\n" +
+                    "Please refer to the README.txt file for more information.",
+                    "Deployment Analyzer", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            ProcessStartInfo startInfo = new ProcessStartInfo();
+            startInfo.FileName = "wscript.exe";
+            startInfo.Arguments = "//nologo \"" + vbsPath + "\"";
+            startInfo.CreateNoWindow = true;
+            startInfo.UseShellExecute = false;
+
+            Process.Start(startInfo);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("Error starting application: " + ex.Message,
+                "Deployment Analyzer", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+}
+"@ > TempExecutable.cs
+
+# Compile the executable
+& "$env:windir\Microsoft.NET\Framework\v4.0.30319\csc.exe" /target:winexe /out:"dist\DeploymentAnalyzer-Release\DeploymentAnalyzer.exe" /reference:System.Windows.Forms.dll TempExecutable.cs
+
+# Clean up
+Remove-Item TempExecutable.cs
+```
+
+### Method 3: Simple VBS to EXE Copy (Last Resort)
+
+If all else fails, you can create a basic executable by copying the VBS file:
+
+```powershell
+# For a specific version
+$version = "1.1.0"  # Update this to your current version
+copy "dist\DeploymentAnalyzer-$version-Release\DeploymentAnalyzer.vbs" "dist\DeploymentAnalyzer-$version-Release\DeploymentAnalyzer.exe"
+
+# Or for the default release folder
+copy "dist\DeploymentAnalyzer-Release\DeploymentAnalyzer.vbs" "dist\DeploymentAnalyzer-Release\DeploymentAnalyzer.exe"
+```
+
+Note: This method creates a file with .exe extension that is actually a VBS script. When double-clicked, Windows will attempt to execute it with the appropriate handler.
+
+### Troubleshooting Executable Creation
+
+If you're having issues with executable creation:
+
+1. **Missing csc.exe**: 
+   - Install Visual Studio with C# development tools
+   - Install .NET Framework SDK
+   - Install .NET Core SDK
+
+2. **Permission Issues**:
+   - Run PowerShell as Administrator
+   - Check folder write permissions
+
+3. **Path Issues**:
+   - Verify the release folder exists
+   - Check that path names don't contain special characters
+
+4. **Alternative Approaches**:
+   - Consider using tools like IExpress to create self-extracting executables
+   - Use third-party VBS to EXE converters
 
 ## Running the Application
 

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-DeploymentAnalyzer V1.1.
+DeploymentAnalyzer.
 Simple Image Deployment Analysis Tool
 
 A simplified GUI application for analyzing image deployment delays.
@@ -11,6 +11,14 @@ with options to customize the analysis and dive deeper when needed.
 .
 (c) 2025 by Axel Schmidt
 """
+
+from version import VERSION, APP_VERSION_DISPLAY, VERSION_DATE
+
+# Debug print to verify version information
+print(f"Debug - Version information:")
+print(f"VERSION = '{VERSION}'")
+print(f"APP_VERSION_DISPLAY = '{APP_VERSION_DISPLAY}'")
+print(f"VERSION_DATE = '{VERSION_DATE}'")
 
 import pandas as pd
 import seaborn as sns
@@ -842,7 +850,8 @@ class SimpleAnalysisGUI:
     def __init__(self, root):
         """Initialize the GUI with screen-fitting size."""
         self.root = root
-        self.root.title("DeploymentAnalyser V1.1")
+        # Modified to ensure full version is displayed
+        self.root.title(f"Deployment Analyzer v{VERSION}")  # Explicitly use VERSION
         
         # Set window to fit screen with some margin
         screen_width = self.root.winfo_screenwidth()
@@ -2404,7 +2413,8 @@ class SimpleAnalysisGUI:
     def show_help(self):
         """Show a help dialog."""
         help_window = tk.Toplevel(self.root)
-        help_window.title("DeploymentAnalyser V1.1")
+        # Modified to ensure full version is displayed
+        help_window.title(f"Deployment Analyzer v{VERSION}")  # Explicitly use VERSION
         help_window.geometry("700x650")
         help_window.minsize(650, 600)
         
@@ -2423,8 +2433,9 @@ class SimpleAnalysisGUI:
         scrollbar.config(command=text.yview)
         
         # Help text
-        help_text = """
-# DeploymentAnalyser V1.1
+        help_text = f"""
+# {APP_VERSION_DISPLAY}
+# Released: {VERSION_DATE}
 
 Copyright © 2025 Axel Schmidt. All rights reserved.
 
