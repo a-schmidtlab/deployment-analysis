@@ -1,0 +1,79 @@
+=============================================
+DEPLOYMENT ANALYZER - BUILD GUIDE
+=============================================
+
+QUICK BUILD REFERENCE FOR DEVELOPERS
+(See DEPLOYMENT.md for more detailed instructions)
+
+1. PREPARE ENVIRONMENT
+   - Install Python 3.9+ if not already installed
+   - Install required packages:
+     pip install -r requirements.txt
+   - Clean previous builds:
+     Remove-Item -Recurse -Force -Path build, dist, *.spec
+
+2. BUILD OPTIONS (CHOOSE ONE)
+
+   A. RECOMMENDED: Ultimate Build (most comprehensive)
+      - Run: .\ultimate_build.bat
+      - Creates complete distribution with all dependencies
+      - Handles optimization and verification automatically
+
+   B. Enhanced Build (more customizable)
+      - Run: .\enhanced_build.bat
+      - Uses custom optimization settings
+      - Explicit DLL inclusion
+
+   C. Standard Build (basic)
+      - Run: .\build.bat
+      - Basic PyInstaller build
+
+3. CREATE FINAL RELEASE
+   - Run: .\create_final_release.bat
+   - When prompted for EXE launcher, type "Y"
+   - Result: dist\DeploymentAnalyzer-Release
+
+4. TEST THE BUILD
+   - Test with: .\dist\DeploymentAnalyzer-Release\DeploymentAnalyzer.exe
+   - Or debug with: .\dist\DeploymentAnalyzer\debug_launcher.bat
+   - Check verify_results.txt in the lib directory
+
+5. PACKAGE FOR DISTRIBUTION
+   - Create zip archive:
+     Compress-Archive -Path .\dist\DeploymentAnalyzer-Release -DestinationPath .\dist\DeploymentAnalyzer-Release.zip -Force
+
+6. TROUBLESHOOTING COMMON ISSUES
+
+   - Failing build:
+     • Check Python path and environment variables
+     • Verify PyInstaller installation
+     • Look for antivirus interference
+
+   - Missing dependencies:
+     • Check build log files
+     • Add missing modules to the --hidden-import parameters
+     • Run verify.bat in the lib directory
+
+   - Large build size:
+     • Run .\update_release_with_exe.bat to clean up
+     • Edit exclusion patterns in .\enhanced_build.bat
+     • Manual cleanup of test directories
+
+   - Application won't start:
+     • Check log files in .app\support\logs
+     • Verify .app directory exists alongside launcher
+     • Ensure VC++ Redistributable is installed
+
+7. FULL BUILD PROCESS CHECKLIST
+
+   □ Update source code for new version
+   □ Update version numbers in all relevant files
+   □ Clean previous builds
+   □ Run ultimate_build.bat
+   □ Run create_final_release.bat (select Y for EXE)
+   □ Test the application
+   □ Create zip archive
+   □ Document changes in release notes
+   □ Test on a clean system before distribution
+
+For complete documentation, see DEPLOYMENT.md 

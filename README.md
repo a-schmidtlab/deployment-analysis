@@ -24,6 +24,39 @@ The Deployment Analyzer is a tool designed to help analyze and visualize deploym
 3. Install required packages: `pip install -r requirements.txt`
 4. Run `python launcher.py` to start the application
 
+## Building and Deploying
+
+To build the application for distribution:
+
+1. Follow the quick guide in `BUILD_GUIDE.txt`
+2. Or see `DEPLOYMENT.md` for detailed instructions
+
+### Quick Build Reference
+
+```powershell
+# Clean previous builds
+Remove-Item -Recurse -Force -Path build, dist, *.spec
+
+# Run the comprehensive build
+.\ultimate_build.bat
+
+# Create a user-friendly distribution
+.\create_final_release.bat
+# (Select 'Y' when prompted for EXE launcher)
+
+# Create a distribution package
+Compress-Archive -Path .\dist\DeploymentAnalyzer-Release -DestinationPath .\dist\DeploymentAnalyzer-Release.zip -Force
+```
+
+The final distribution will be located in `dist\DeploymentAnalyzer-Release` and will contain:
+- `DeploymentAnalyzer.exe` - Main executable that users can double-click
+- `README.txt` - User documentation
+- `.app/` - Hidden folder containing application files
+
+### Testing the Build
+
+Always test the final distribution on a clean system before distributing to users to ensure all dependencies are included and the application starts properly.
+
 ## Features
 
 - Data import from CSV, Excel, and multiple other formats
