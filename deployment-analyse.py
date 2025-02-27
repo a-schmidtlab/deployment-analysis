@@ -986,7 +986,12 @@ class SimpleAnalysisGUI:
         # Button containers
         self.years_buttons_frame = ttk.Frame(self.years_frame)
         self.months_buttons_frame = ttk.Frame(self.months_frame)
-        self.weeks_buttons_frame = ttk.Frame(self.weeks_frame)
+        
+        # Add a canvas and scrollable frame for weeks to handle many buttons
+        self.weeks_canvas = tk.Canvas(self.weeks_frame, borderwidth=0, highlightthickness=0, height=30)
+        self.weeks_buttons_frame = ttk.Frame(self.weeks_canvas)
+        self.weeks_scrollbar = ttk.Scrollbar(self.weeks_frame, orient="horizontal", command=self.weeks_canvas.xview)
+        self.weeks_canvas.configure(xscrollcommand=self.weeks_scrollbar.set)
         
         # Help button
         self.help_button = ttk.Button(self.navigation_frame, text="Help", command=self.show_help)
@@ -1053,10 +1058,27 @@ class SimpleAnalysisGUI:
         # Weeks section (initially hidden)
         self.weeks_frame.pack(fill="x", **padding)
         self.weeks_label.pack(side="left", **padding)
-        self.weeks_buttons_frame.pack(side="left", fill="x", expand=True, **padding)
+        
+        # Configure the scrollable canvas for weeks buttons
+        self.weeks_canvas.pack(side="left", fill="x", expand=True, **padding)
+        # Scrollbar will be packed only when needed
+        
+        # Bind the canvas for scrolling and resizing
+        self.weeks_canvas_frame = self.weeks_canvas.create_window((0, 0), window=self.weeks_buttons_frame, anchor="nw")
+        self.weeks_buttons_frame.bind("<Configure>", self._on_weeks_frame_configure)
+        self.weeks_canvas.bind("<Configure>", self._on_weeks_canvas_configure)
         
         # Help button
         self.help_button.grid(row=0, column=1, sticky="e", **padding)
+    
+    def _on_weeks_frame_configure(self, event):
+        """Update the scroll region when the frame changes size."""
+        self.weeks_canvas.configure(scrollregion=self.weeks_canvas.bbox("all"))
+    
+    def _on_weeks_canvas_configure(self, event):
+        """Adjust the frame width when the canvas changes size."""
+        # Update the width of the buttons frame to fit the canvas
+        self.weeks_canvas.itemconfig(self.weeks_canvas_frame, width=event.width)
     
     def browse_file(self):
         """Open a file dialog to browse for a file."""
@@ -1956,8 +1978,21 @@ class SimpleAnalysisGUI:
                     # For older pandas versions
                     all_weeks = sorted(year_data['Bildankunft'].apply(lambda x: x.isocalendar()[1]).unique())
                 
-                # Create the week buttons (only for weeks that have data)
-                for week in all_weeks:
+                # First make sure week frame components are properly set up
+                self.weeks_frame.pack(fill="x", padx=3, pady=3)
+                self.weeks_label.pack(side="left", padx=3, pady=3)
+                self.weeks_canvas.pack(side="left", fill="x", expand=True, padx=3, pady=3)
+                
+                # Configure weeks_buttons_frame as a grid
+                # Calculate the number of columns based on the expected width
+                expected_width = 50  # Estimated button width including padding
+                canvas_width = self.weeks_canvas.winfo_width()
+                if canvas_width <= 1:  # If canvas not yet drawn, use a default
+                    canvas_width = 400
+                columns = max(1, canvas_width // expected_width)
+                
+                # Create the week buttons in a grid layout
+                for i, week in enumerate(all_weeks):
                     try:
                         # Check if there's data for this week
                         week_data = None
@@ -1974,20 +2009,40 @@ class SimpleAnalysisGUI:
                                 text=f"W{week}",
                                 command=lambda w=week, y=current_year: self.select_week(y, w)
                             )
-                            btn.pack(side="left", padx=2, pady=2)
+                            row = i // columns
+                            col = i % columns
+                            btn.grid(row=row, column=col, padx=2, pady=2, sticky="ew")
                     except Exception as e:
                         print(f"Error checking data for week {week}: {str(e)}")
                 
+                # Configure grid columns to be equal width
+                for col in range(columns):
+                    self.weeks_buttons_frame.columnconfigure(col, weight=1)
+                
                 # Make sure the week frame is visible if we have week buttons
                 if len(self.weeks_buttons_frame.winfo_children()) > 0:
-                    self.weeks_frame.pack(fill="x", padx=3, pady=3)
-                    self.weeks_label.pack(side="left", padx=3, pady=3)
-                    self.weeks_buttons_frame.pack(side="left", fill="x", expand=True, padx=3, pady=3)
-                
+                    # Update canvas and show scrollbar only if needed
+                    self.weeks_canvas.update_idletasks()  # Update to get correct dimensions
+                    
+                    # Get the true height of the buttons frame for proper sizing
+                    buttons_height = self.weeks_buttons_frame.winfo_reqheight()
+                    self.weeks_canvas.config(height=buttons_height + 5)  # Add a small padding
+                    
+                    # Only show scrollbar if the content is wider than the canvas
+                    bbox = self.weeks_canvas.bbox("all")
+                    if bbox and bbox[2] > self.weeks_canvas.winfo_width():
+                        self.weeks_scrollbar.pack(side="bottom", fill="x")
+                    else:
+                        # Hide scrollbar if not needed
+                        self.weeks_scrollbar.pack_forget()
+                    
+                    # Configure the scrollregion now that buttons are placed
+                    self.weeks_canvas.configure(scrollregion=self.weeks_canvas.bbox("all"))
+            
             except Exception as e:
                 # If there's an error getting week data, log it and continue
                 print(f"Error creating week buttons: {str(e)}")
-                
+    
     def select_month_year(self, month, year):
         """Handle selection of a specific month and year."""
         # Disable buttons during analysis to prevent multiple clicks
