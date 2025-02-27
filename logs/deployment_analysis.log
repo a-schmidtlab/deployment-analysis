@@ -157,3 +157,5 @@
 2025-02-27 09:22:27,374 - __main__ - INFO - [deployment-analyse.py:166] - Using TkAgg backend for matplotlib
 2025-02-27 09:24:09,952 - __main__ - INFO - [deployment-analyse.py:158] - Logging system initialized
 2025-02-27 09:24:09,953 - __main__ - INFO - [deployment-analyse.py:166] - Using TkAgg backend for matplotlib
+2025-02-27 10:45:58,308 - __main__ - INFO - [deployment-analyse.py:166] - Logging system initialized
+2025-02-27 10:45:58,310 - __main__ - INFO - [deployment-analyse.py:174] - Using TkAgg backend for matplotlib
