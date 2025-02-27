@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
+DeploymentAnalyzer V1.1.
 Simple Image Deployment Analysis Tool
 
 A simplified GUI application for analyzing image deployment delays.
@@ -841,7 +842,7 @@ class SimpleAnalysisGUI:
     def __init__(self, root):
         """Initialize the GUI with screen-fitting size."""
         self.root = root
-        self.root.title("deployment-analyse ver. 1.0.0")
+        self.root.title("DeploymentAnalyser V1.1")
         
         # Set window to fit screen with some margin
         screen_width = self.root.winfo_screenwidth()
@@ -2403,7 +2404,7 @@ class SimpleAnalysisGUI:
     def show_help(self):
         """Show a help dialog."""
         help_window = tk.Toplevel(self.root)
-        help_window.title("deployment-analyse ver. 1.0.0")
+        help_window.title("DeploymentAnalyser V1.1")
         help_window.geometry("700x650")
         help_window.minsize(650, 600)
         
@@ -2423,7 +2424,7 @@ class SimpleAnalysisGUI:
         
         # Help text
         help_text = """
-# deployment-analyse ver. 1.0.0
+# DeploymentAnalyser V1.1
 
 Copyright © 2025 Axel Schmidt. All rights reserved.
 
