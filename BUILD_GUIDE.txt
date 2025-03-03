@@ -1,79 +1,45 @@
-=============================================
-DEPLOYMENT ANALYZER - BUILD GUIDE
-=============================================
+======================================================
+DEPLOYMENT ANALYZER - QUICK BUILD GUIDE
+======================================================
 
-QUICK BUILD REFERENCE FOR DEVELOPERS
-(See DEPLOYMENT.md for more detailed instructions)
+This guide provides quick instructions for building the Deployment Analyzer application.
+For detailed instructions, please see DEPLOYMENT.md.
 
-1. PREPARE ENVIRONMENT
-   - Install Python 3.9+ if not already installed
-   - Install required packages:
-     pip install -r requirements.txt
-   - Clean previous builds:
-     Remove-Item -Recurse -Force -Path build, dist, *.spec
+PREREQUISITES:
+-------------
+- Python 3.9 or higher
+- Required packages (install with 'pip install -r requirements.txt')
+- PowerShell (recommended) or Command Prompt
 
-2. BUILD OPTIONS (CHOOSE ONE)
+QUICK BUILD STEPS:
+----------------
+1. Update version information (if needed):
+   Open 'version.py' and update VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH,
+   and VERSION_DATE variables.
 
-   A. RECOMMENDED: Ultimate Build (most comprehensive)
-      - Run: .\ultimate_build.bat
-      - Creates complete distribution with all dependencies
-      - Handles optimization and verification automatically
+2. Clean previous builds:
+   PowerShell: Remove-Item -Recurse -Force -Path build, dist, *.spec
+   CMD: rmdir /s /q build dist & del *.spec
 
-   B. Enhanced Build (more customizable)
-      - Run: .\enhanced_build.bat
-      - Uses custom optimization settings
-      - Explicit DLL inclusion
+3. Build the application:
+   Run: .\ultimate_build.bat
 
-   C. Standard Build (basic)
-      - Run: .\build.bat
-      - Basic PyInstaller build
+4. Create versioned release:
+   Run: .\create_versioned_release.bat
+   
+   This will:
+   - Extract version number from version.py
+   - Create a properly named folder (DeploymentAnalyzer-{VERSION}-Release)
+   - Create a clean user interface with only EXE and README visible
+   - Hide all application files in the .app folder
 
-3. CREATE FINAL RELEASE
-   - Run: .\create_final_release.bat
-   - When prompted for EXE launcher, type "Y"
-   - Result: dist\DeploymentAnalyzer-Release
+5. Test the application:
+   Run: .\dist\DeploymentAnalyzer-{VERSION}-Release\DeploymentAnalyzer.exe
 
-4. TEST THE BUILD
-   - Test with: .\dist\DeploymentAnalyzer-Release\DeploymentAnalyzer.exe
-   - Or debug with: .\dist\DeploymentAnalyzer\debug_launcher.bat
-   - Check verify_results.txt in the lib directory
+TROUBLESHOOTING:
+--------------
+- If the application fails to start, check log files in .app\support\logs
+- For build issues, see the "Troubleshooting" section in DEPLOYMENT.md
+- If EXE launcher doesn't work, try installing .NET Framework or Visual Studio with C# tools
 
-5. PACKAGE FOR DISTRIBUTION
-   - Create zip archive:
-     Compress-Archive -Path .\dist\DeploymentAnalyzer-Release -DestinationPath .\dist\DeploymentAnalyzer-Release.zip -Force
-
-6. TROUBLESHOOTING COMMON ISSUES
-
-   - Failing build:
-     • Check Python path and environment variables
-     • Verify PyInstaller installation
-     • Look for antivirus interference
-
-   - Missing dependencies:
-     • Check build log files
-     • Add missing modules to the --hidden-import parameters
-     • Run verify.bat in the lib directory
-
-   - Large build size:
-     • Run .\update_release_with_exe.bat to clean up
-     • Edit exclusion patterns in .\enhanced_build.bat
-     • Manual cleanup of test directories
-
-   - Application won't start:
-     • Check log files in .app\support\logs
-     • Verify .app directory exists alongside launcher
-     • Ensure VC++ Redistributable is installed
-
-7. FULL BUILD PROCESS CHECKLIST
-
-   □ Update source code for new version
-   □ Update version numbers in all relevant files
-   □ Clean previous builds
-   □ Run ultimate_build.bat
-   □ Run create_final_release.bat (select Y for EXE)
-   □ Test the application
-   □ Create zip archive
-   □ Document changes in release notes
-   □ Test on a clean system before distribution
-
-For complete documentation, see DEPLOYMENT.md 
+For more information, see DEPLOYMENT.md 

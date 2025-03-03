@@ -12,10 +12,14 @@ import traceback
 import time
 import datetime
 
+# Configure numpy to avoid source directory import issues
+os.environ['OPENBLAS_NUM_THREADS'] = '1'  # Avoid threading issues with numpy
+sys.path = [p for p in sys.path if not p.endswith('numpy')]  # Remove numpy from source path if present
+
 # Explicitly import all required packages to ensure they're included
 try:
+    # Import non-numpy packages first
     import pandas as pd
-    import numpy as np
     import matplotlib
     import matplotlib.pyplot as plt
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
@@ -30,6 +34,9 @@ try:
     import openpyxl
     import PIL
     from PIL import Image
+    
+    # Now import numpy after path configuration
+    import numpy as np
     
     print(f"Successfully imported required packages:")
     print(f"pandas {pd.__version__}")
