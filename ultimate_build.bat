@@ -38,10 +38,10 @@ mkdir "%DIST_PATH%" 2>nul
 
 echo Cleaned previous builds >> %LOG_FILE%
 
-:: Verify Python modules
+:: Verify Python modules with special handling for numpy
 echo.
 echo Verifying required Python modules...
-python -c "import pandas, numpy, matplotlib, seaborn, tkinter, PIL; print('All modules imported successfully!')" >> %LOG_FILE% 2>&1
+python -c "import sys; sys.path = [p for p in sys.path if not p.endswith('numpy')]; import pandas, matplotlib, seaborn, tkinter, PIL; import numpy; print('All modules imported successfully!')" >> %LOG_FILE% 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: Missing required Python modules!
     echo ERROR: Missing required Python modules! >> %LOG_FILE%
@@ -49,6 +49,11 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 echo Required modules verified >> %LOG_FILE%
+
+:: Get numpy path for special handling
+for /f "tokens=*" %%i in ('python -c "import numpy; print(numpy.__path__[0])"') do set NUMPY_PATH=%%i
+echo Numpy path: %NUMPY_PATH% >> %LOG_FILE%
+echo Numpy path: %NUMPY_PATH%
 
 :: Generate a directory manifest list for verification
 echo.
@@ -63,7 +68,7 @@ echo Generating spec file...
 echo # -*- mode: python -*- > DeploymentAnalyzer_ultimate.spec
 echo from PyInstaller.utils.hooks import collect_all >> DeploymentAnalyzer_ultimate.spec
 echo. >> DeploymentAnalyzer_ultimate.spec
-echo datas = [('data', 'data'), ('logs', 'logs'), ('output', 'output'), ('deployment-analyse.py', '.')] >> DeploymentAnalyzer_ultimate.spec
+echo datas = [('data', 'data'), ('logs', 'logs'), ('output', 'output'), ('deployment-analyse.py', '.'), ('version.py', '.')] >> DeploymentAnalyzer_ultimate.spec
 echo binaries = [] >> DeploymentAnalyzer_ultimate.spec
 echo. >> DeploymentAnalyzer_ultimate.spec
 echo # Explicitly add Python DLLs >> DeploymentAnalyzer_ultimate.spec
@@ -91,17 +96,41 @@ echo             rel_path = os.path.relpath(full_path, r'%PYTHON_PREFIX%') >> De
 echo             target_dir = os.path.dirname(rel_path) >> DeploymentAnalyzer_ultimate.spec
 echo             datas.append((full_path, target_dir)) >> DeploymentAnalyzer_ultimate.spec
 echo. >> DeploymentAnalyzer_ultimate.spec
+
+:: Add special handling for numpy
+echo # Special handling for numpy to avoid source directory import issues >> DeploymentAnalyzer_ultimate.spec
+echo import numpy >> DeploymentAnalyzer_ultimate.spec
+echo numpy_path = os.path.dirname(numpy.__file__) >> DeploymentAnalyzer_ultimate.spec
+echo numpy_dlls = glob.glob(os.path.join(numpy_path, 'core', '*.dll')) >> DeploymentAnalyzer_ultimate.spec
+echo numpy_dlls += glob.glob(os.path.join(numpy_path, 'random', '*.dll')) >> DeploymentAnalyzer_ultimate.spec
+echo numpy_dlls += glob.glob(os.path.join(numpy_path, 'linalg', '*.dll')) >> DeploymentAnalyzer_ultimate.spec
+echo numpy_dlls += glob.glob(os.path.join(numpy_path, 'fft', '*.dll')) >> DeploymentAnalyzer_ultimate.spec
+echo for dll in numpy_dlls: >> DeploymentAnalyzer_ultimate.spec
+echo     rel_path = os.path.join('numpy', os.path.relpath(os.path.dirname(dll), numpy_path)) >> DeploymentAnalyzer_ultimate.spec
+echo     binaries.append((dll, rel_path)) >> DeploymentAnalyzer_ultimate.spec
+echo. >> DeploymentAnalyzer_ultimate.spec
+
 echo # Add package dependencies >> DeploymentAnalyzer_ultimate.spec
-echo hiddenimports = ['pandas', 'numpy', 'matplotlib', 'matplotlib.backends.backend_tkagg', >> DeploymentAnalyzer_ultimate.spec
+echo hiddenimports = ['pandas', 'numpy', 'numpy.core', 'numpy.random', 'numpy.linalg', 'numpy.fft', >> DeploymentAnalyzer_ultimate.spec
+echo                  'matplotlib', 'matplotlib.backends.backend_tkagg', >> DeploymentAnalyzer_ultimate.spec
 echo                  'seaborn', 'configparser', 'tkinter', 'PIL', 'csv', 'openpyxl', >> DeploymentAnalyzer_ultimate.spec
 echo                  'logging', 'logging.handlers', 'datetime', 'argparse', 'threading'] >> DeploymentAnalyzer_ultimate.spec
 echo. >> DeploymentAnalyzer_ultimate.spec
+
 echo # Collect all dependencies >> DeploymentAnalyzer_ultimate.spec
-echo packages = ['pandas', 'numpy', 'matplotlib', 'seaborn', 'PIL', 'openpyxl'] >> DeploymentAnalyzer_ultimate.spec
+echo packages = ['pandas', 'matplotlib', 'seaborn', 'PIL', 'openpyxl'] >> DeploymentAnalyzer_ultimate.spec
 echo for package in packages: >> DeploymentAnalyzer_ultimate.spec
 echo     tmp_ret = collect_all(package) >> DeploymentAnalyzer_ultimate.spec
 echo     datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2] >> DeploymentAnalyzer_ultimate.spec
 echo. >> DeploymentAnalyzer_ultimate.spec
+
+echo # Special collection for numpy with exclude >> DeploymentAnalyzer_ultimate.spec
+echo numpy_ret = collect_all('numpy') >> DeploymentAnalyzer_ultimate.spec
+echo datas += numpy_ret[0] >> DeploymentAnalyzer_ultimate.spec
+echo binaries += numpy_ret[1] >> DeploymentAnalyzer_ultimate.spec
+echo hiddenimports += numpy_ret[2] >> DeploymentAnalyzer_ultimate.spec
+echo. >> DeploymentAnalyzer_ultimate.spec
+
 echo # Create the Analysis object >> DeploymentAnalyzer_ultimate.spec
 echo a = Analysis( >> DeploymentAnalyzer_ultimate.spec
 echo     ['standalone.py'], >> DeploymentAnalyzer_ultimate.spec

@@ -1,7 +1,7 @@
 # -*- mode: python -*- 
 from PyInstaller.utils.hooks import collect_all 
  
-datas = [('data', 'data'), ('logs', 'logs'), ('output', 'output'), ('deployment-analyse.py', '.')] 
+datas = [('data', 'data'), ('logs', 'logs'), ('output', 'output'), ('deployment-analyse.py', '.'), ('version.py', '.')] 
 binaries = [] 
  
 # Explicitly add Python DLLs 
@@ -29,16 +29,34 @@ if os.path.exists(tcl_dir):
             target_dir = os.path.dirname(rel_path) 
             datas.append((full_path, target_dir)) 
  
+# Special handling for numpy to avoid source directory import issues 
+import numpy 
+numpy_path = os.path.dirname(numpy.__file__) 
+numpy_dlls = glob.glob(os.path.join(numpy_path, 'core', '*.dll')) 
+numpy_dlls += glob.glob(os.path.join(numpy_path, 'random', '*.dll')) 
+numpy_dlls += glob.glob(os.path.join(numpy_path, 'linalg', '*.dll')) 
+numpy_dlls += glob.glob(os.path.join(numpy_path, 'fft', '*.dll')) 
+for dll in numpy_dlls: 
+    rel_path = os.path.join('numpy', os.path.relpath(os.path.dirname(dll), numpy_path)) 
+    binaries.append((dll, rel_path)) 
+ 
 # Add package dependencies 
-hiddenimports = ['pandas', 'numpy', 'matplotlib', 'matplotlib.backends.backend_tkagg', 
+hiddenimports = ['pandas', 'numpy', 'numpy.core', 'numpy.random', 'numpy.linalg', 'numpy.fft', 
+                 'matplotlib', 'matplotlib.backends.backend_tkagg', 
                  'seaborn', 'configparser', 'tkinter', 'PIL', 'csv', 'openpyxl', 
                  'logging', 'logging.handlers', 'datetime', 'argparse', 'threading'] 
  
 # Collect all dependencies 
-packages = ['pandas', 'numpy', 'matplotlib', 'seaborn', 'PIL', 'openpyxl'] 
+packages = ['pandas', 'matplotlib', 'seaborn', 'PIL', 'openpyxl'] 
 for package in packages: 
     tmp_ret = collect_all(package) 
     datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2] 
+ 
+# Special collection for numpy with exclude 
+numpy_ret = collect_all('numpy') 
+datas += numpy_ret[0] 
+binaries += numpy_ret[1] 
+hiddenimports += numpy_ret[2] 
  
 # Create the Analysis object 
 a = Analysis( 

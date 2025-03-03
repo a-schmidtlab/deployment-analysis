@@ -40,18 +40,14 @@ Remove-Item -Recurse -Force -Path build, dist, *.spec
 # Run the comprehensive build
 .\ultimate_build.bat
 
-# Create a user-friendly distribution
-.\create_final_release.bat
-# (Select 'Y' when prompted for EXE launcher)
-
-# Create a distribution package
-Compress-Archive -Path .\dist\DeploymentAnalyzer-Release -DestinationPath .\dist\DeploymentAnalyzer-Release.zip -Force
+# Create a user-friendly versioned distribution
+.\create_versioned_release.bat
 ```
 
-The final distribution will be located in `dist\DeploymentAnalyzer-Release` and will contain:
+The final distribution will be located in `dist\DeploymentAnalyzer-{VERSION}-Release` and will contain:
 - `DeploymentAnalyzer.exe` - Main executable that users can double-click
 - `README.txt` - User documentation
-- `.app/` - Hidden folder containing application files
+- `.app/` - Hidden folder containing application files and DLLs
 
 ### Testing the Build
 
@@ -70,7 +66,7 @@ Always test the final distribution on a clean system before distributing to user
 
 ### GUI Mode
 
-1. Start the application by running `DeploymentAnalyzer.bat`
+1. Start the application by running `DeploymentAnalyzer.exe`
 2. Use the file menu to import your data
 3. Select analysis options from the toolbar
 4. Generate visualizations using the chart buttons
@@ -100,7 +96,7 @@ If you're building from source, the build scripts automatically handle these opt
 
 If the application doesn't start:
 
-1. Check the log files in the `logs` directory
+1. Check the log files in the `.app\support\logs` directory
 2. Ensure all required dependencies are installed
 3. Verify that you have the necessary permissions to access the data directory
 
@@ -109,11 +105,15 @@ If you encounter specific errors, please check the `DEPLOYMENT.md` file for deta
 ## Directory Structure
 
 ```
-DeploymentAnalyzer/
-├── data/           # Data files and templates
-├── logs/           # Log files
-├── output/         # Generated reports and output files
-└── .app/           # Application files (hidden)
+DeploymentAnalyzer-{VERSION}-Release/
+├── DeploymentAnalyzer.exe  # Main launcher (visible)
+├── README.txt              # Documentation (visible)
+└── .app/                   # Application files (hidden)
+    ├── lib/                # Core application files
+    └── support/            # Data, logs, and output directories
+        ├── data/           # User data
+        ├── logs/           # Log files
+        └── output/         # Generated output
 ```
 
 ## License

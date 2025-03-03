@@ -80,36 +80,43 @@ Remove-Item -Recurse -Force -ErrorAction SilentlyContinue -Path build, dist, *.s
 
 ### 3. Create the Final Distribution
 
+#### Option A: Create Versioned Release (Recommended)
 ```powershell
-# Create the clean, user-friendly distribution
+# Create a clean, versioned distribution that uses the version number from version.py
+.\create_versioned_release.bat
+```
+
+This script automatically:
+- Extracts the version number from `version.py` using Python
+- Creates a properly named folder like `DeploymentAnalyzer-1.1.1-Release`
+- Sets up a clean structure with only an EXE and README.txt visible
+- Hides all application files in the `.app` folder structure
+- Creates an executable launcher (using multiple methods for compatibility)
+
+#### Option B: Create Standard Release
+```powershell
+# Create the clean, user-friendly distribution with a non-versioned folder name
 .\create_final_release.bat
 # IMPORTANT: When prompted for EXE launcher, always select 'Y' to create an executable launcher
-# This ensures only the EXE file is visible in the top directory for better user experience
 ```
 
 ### 4. Verify the Build
 
 ```powershell
 # Test the application directly
-.\dist\DeploymentAnalyzer-Release\DeploymentAnalyzer.exe
+.\dist\DeploymentAnalyzer-{VERSION}-Release\DeploymentAnalyzer.exe
 
 # Or use the debug launcher for more detailed output
 .\dist\DeploymentAnalyzer\debug_launcher.bat
 ```
 
-### 5. Package for Distribution
-
-```powershell
-# Create a zip archive of the release
-Compress-Archive -Path .\dist\DeploymentAnalyzer-Release -DestinationPath .\dist\DeploymentAnalyzer-Release.zip -Force
-```
-
-### 6. Common Issues & Quick Fixes
+### 5. Common Issues & Quick Fixes
 
 - **Missing files in build**: Check `verify_results.txt` in the lib directory
 - **Application won't start**: Run the debug launcher to see error messages
 - **Build script fails**: Make sure Python environment variables are correctly set
 - **Large build size**: Use `update_release_with_exe.bat` to clean up unnecessary files
+- **EXE launcher issues**: If the EXE launcher doesn't work, try running the VBS file directly or install .NET Framework
 
 ## Building the Application
 
@@ -221,20 +228,16 @@ For consistent and reliable builds, follow this workflow:
    # or .\enhanced_build.bat for more control
    ```
 
-5. **Create the final release**:
+5. **Create the versioned release**:
    ```powershell
-   .\create_final_release.bat
-   # Answer 'Y' to create EXE launcher
+   .\create_versioned_release.bat
    ```
 
 6. **Test the release**:
-   - Test directly: `.\dist\DeploymentAnalyzer-Release\DeploymentAnalyzer.exe`
+   - Test directly: `.\dist\DeploymentAnalyzer-{VERSION}-Release\DeploymentAnalyzer.exe`
    - Test with debug info: `.\dist\DeploymentAnalyzer\debug_launcher.bat`
 
-7. **Create distribution package**:
-   ```powershell
-   Compress-Archive -Path .\dist\DeploymentAnalyzer-Release -DestinationPath .\dist\DeploymentAnalyzer-Release.zip -Force
-   ```
+7. **Document changes** in a release notes file
 
 8. **Verify distribution size**:
    - Should be approximately 330-350 MB
@@ -242,8 +245,6 @@ For consistent and reliable builds, follow this workflow:
      ```powershell
      .\update_release_with_exe.bat
      ```
-
-9. **Document changes** in a release notes file
 
 ## Improved Deployment Process
 
@@ -485,12 +486,6 @@ copy "dist\DeploymentAnalyzer-Release\DeploymentAnalyzer.vbs" "dist\DeploymentAn
    ```powershell
    # Test the application
    .\dist\DeploymentAnalyzer-Release\DeploymentAnalyzer.exe
-   ```
-
-5. **Package the Distribution**:
-   ```powershell
-   # Create a zip archive
-   Compress-Archive -Path .\dist\DeploymentAnalyzer-Release -DestinationPath .\dist\DeploymentAnalyzer-Release.zip -Force
    ```
 
 ## Creating Executable Launchers
