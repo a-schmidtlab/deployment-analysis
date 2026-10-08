@@ -1,125 +1,149 @@
 # Deployment Analyzer
 
-A tool for analyzing deployment data with visualization capabilities.
-(c) 2025 by Axel Schmidt
+Heatmaps of image deployment delays: how long does it take from the arrival of
+an image to its activation in the editorial system, by date and hour of day?
 
+![GUI](docs/images/gui.png)
 
-
-## Introduction
-
-The Deployment Analyzer is a tool designed to help analyze and visualize deployment data. It provides both a command-line interface and a graphical user interface for importing data, performing analysis, and generating reports.
+The tool reads CSV or Excel exports of the editorial system, reconstructs the
+arrival time of every image from the IPTC instruction field, computes the delay
+until activation and shows the average delay per date (or weekday, or month)
+and hour of arrival. It runs as a desktop application (Tkinter) or on the
+command line.
 
 ## Installation
 
-### Pre-built Binary (Recommended)
+Python 3.10 or newer.
 
-1. Download the latest release package
-2. Extract the ZIP file to a directory of your choice
-3. Run `DeploymentAnalyzer.exe` to start the application
-
-### From Source
-
-1. Ensure Python 3.9 or higher is installed
-2. Clone this repository
-3. Install required packages: `pip install -r requirements.txt`
-4. Run `python launcher.py` to start the application
-
-## Building and Deploying
-
-To build the application for distribution:
-
-1. Follow the quick guide in `BUILD_GUIDE.txt`
-2. Or see `DEPLOYMENT.md` for detailed instructions
-
-### Quick Build Reference
-
-```powershell
-# Clean previous builds
-Remove-Item -Recurse -Force -Path build, dist, *.spec
-
-# Run the comprehensive build
-.\ultimate_build.bat
-
-# Create a user-friendly versioned distribution
-.\create_versioned_release.bat
+```bash
+pip install git+https://github.com/a-schmidtlab/deployment-analysis
 ```
 
-The final distribution will be located in `dist\DeploymentAnalyzer-{VERSION}-Release` and will contain:
-- `DeploymentAnalyzer.exe` - Main executable that users can double-click
-- `README.txt` - User documentation
-- `.app/` - Hidden folder containing application files and DLLs
+For development:
 
-### Testing the Build
+```bash
+git clone https://github.com/a-schmidtlab/deployment-analysis
+cd deployment-analysis
+pip install -e ".[dev]"
+```
 
-Always test the final distribution on a clean system before distributing to users to ensure all dependencies are included and the application starts properly.
-
-## Features
-
-- Data import from CSV, Excel, and multiple other formats
-- Advanced data filtering and transformation
-- Interactive data visualization
-- Export results to various formats (CSV, Excel, PDF)
-- Comprehensive reporting capabilities
-- Batch processing for multiple data sets
+On Linux, Tkinter may need a system package (`python3-tk` on Debian/Ubuntu).
+A Windows build without a Python installation is described under
+[Windows build](#windows-build).
 
 ## Usage
 
-### GUI Mode
+### GUI
 
-1. Start the application by running `DeploymentAnalyzer.exe`
-2. Use the file menu to import your data
-3. Select analysis options from the toolbar
-4. Generate visualizations using the chart buttons
-5. Export results using the export menu
-
-### Command-line Mode
-
-For batch processing or automation, use the command-line interface:
-
-```
-python deployment-analyse.py --input data/input.csv --output output/results.xlsx
+```bash
+deployment-analyzer
 ```
 
-Use `--help` to see all available command-line options.
+- **Import** loads one or more export files; **+ Add** merges further files
+  into the current data set. Files with identical content are skipped.
+- **Period** selects all data, a year, a month or an ISO week.
+- **View** switches between the timeline (one row per date), the weekday
+  profile and the month profile.
+- **Export image** saves the heatmap as PNG, PDF or SVG; **Export data**
+  saves the processed rows of the current selection as CSV or Excel.
 
-## Disk Space Requirements
+### Command line
 
-The application requires approximately 350 MB of disk space when installed. This optimized size was achieved by:
+```bash
+# statistics only
+deployment-analyzer examples/sample_data.csv
 
-- Excluding large sample CSV files
-- Removing test directories from libraries
-- Eliminating unnecessary sample data and documentation
+# heatmap of one ISO week, weekday profile
+deployment-analyzer exports/*.csv --year 2025 --week 7 -g weekly -o week7.png
 
-If you're building from source, the build scripts automatically handle these optimizations.
-
-## Troubleshooting
-
-If the application doesn't start:
-
-1. Check the log files in the `.app\support\logs` directory
-2. Ensure all required dependencies are installed
-3. Verify that you have the necessary permissions to access the data directory
-
-If you encounter specific errors, please check the `DEPLOYMENT.md` file for detailed troubleshooting steps.
-
-## Directory Structure
-
+# processed rows of February as CSV
+deployment-analyzer exports/*.csv --year 2025 --month 2 --export-csv feb.csv
 ```
-DeploymentAnalyzer-{VERSION}-Release/
-├── DeploymentAnalyzer.exe  # Main launcher (visible)
-├── README.txt              # Documentation (visible)
-└── .app/                   # Application files (hidden)
-    ├── lib/                # Core application files
-    └── support/            # Data, logs, and output directories
-        ├── data/           # User data
-        ├── logs/           # Log files
-        └── output/         # Generated output
+
+```text
+Loaded 3,000 rows from 1 file(s); 3,000 usable, 0 dropped (0 unparseable, 0 negative, 0 above 1440 min)
+Records          3,000
+Average delay    6.9 min
+Median delay     5.9 min
+95th percentile  11.9 min
+Minimum delay    0.1 min
+Maximum delay    245.2 min
 ```
+
+`deployment-analyzer --help` lists all options. Granularities (`-g`):
+`daily` and `yearly` (one row per date), `weekly` (Monday to Sunday),
+`monthly` (January to December), `hourly` (one row).
+
+![Daily view](docs/images/example_daily.png)
+
+### Python
+
+```python
+from deployment_analyzer import load_files, process, pivot_delays, heatmap_figure, save_figure
+
+data, report = process(load_files(["export.csv"]))
+save_figure(heatmap_figure(pivot_delays(data, "weekly"), "weekly"), "weekly.png")
+```
+
+## Input format
+
+Semicolon- or comma-separated CSV (UTF-8, UTF-8 with BOM or Windows-1252) or
+Excel, with these columns:
+
+| Column | Example |
+|--------|---------|
+| `IPTC_DE Anweisung` | `[23:51:45] *** World Rights ***` |
+| `IPTC_EN Anweisung` | `[23:51:45] *** World Rights ***` |
+| `Bild Upload Zeitpunkt` | `31.03.2024 23:55:07` |
+| `Bild Veröffentlicht` | `Ja` |
+| `Bild Aktivierungszeitpunkt` | `31.03.2024 23:55:07` |
+
+Exports without a header row are accepted if they have exactly these five
+columns in this order. Alternatively a file may contain `Bildankunft` and
+`Onlinestellung` timestamps directly. How arrival time and delay are computed
+is described in [docs/METHOD.md](docs/METHOD.md).
+
+`examples/sample_data.csv` is synthetic (generated by
+`tools/make_sample_data.py`). The repository contains no operational data.
+
+## Development
+
+```bash
+ruff check . && ruff format --check . && pytest
+```
+
+The GUI test needs Tkinter and a display; it is skipped otherwise. On a
+headless Linux machine run it with `xvfb-run pytest`.
+
+```text
+src/deployment_analyzer/
+  loading.py      read CSV/Excel, detect encoding, delimiter, missing header, duplicates
+  processing.py   arrival/activation timestamps, delay, calendar columns
+  analysis.py     period filters, pivot tables, statistics
+  plotting.py     heatmap figures (no pyplot, safe in the GUI)
+  cli.py          command line
+  gui.py          Tkinter application
+  sampledata.py   synthetic test data
+```
+
+## Windows build
+
+```powershell
+.\packaging\build.ps1
+```
+
+creates `dist\DeploymentAnalyzer-<version>-win64.zip` with
+`DeploymentAnalyzer.exe` (PyInstaller, one folder). Unzip and start the exe.
 
 ## License
 
-This software is licensed under the MIT License. See the LICENSE file for details.
+[PolyForm Noncommercial License 1.0.0](LICENSE). Use, modification and
+redistribution are free for noncommercial purposes, including personal use,
+research, education and public or charitable organisations. Commercial use
+requires a separate license from the author.
 
-## Support
+## Citation
 
-For support, please open an issue on our issue tracker or contact Axel Schmidt.
+See [CITATION.cff](CITATION.cff).
+
+© 2025–2026 Axel Schmidt

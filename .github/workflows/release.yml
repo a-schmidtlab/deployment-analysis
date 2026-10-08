@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build
+        shell: pwsh
+        run: .\packaging\build.ps1
+      - name: Smoke test of the bundle
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem dist -Recurse -Filter DeploymentAnalyzer.exe | Select-Object -First 1
+          $p = Start-Process $exe.FullName -ArgumentList "--self-test" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "self-test failed ($($p.ExitCode))" }
+          $p = Start-Process $exe.FullName -ArgumentList "examples\sample_data.csv","-o","smoke.png" -Wait -PassThru
+          if ($p.ExitCode -ne 0 -or -not (Test-Path smoke.png)) { throw "batch run failed ($($p.ExitCode))" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DeploymentAnalyzer-win64
+          path: dist/*.zip
+      - name: Attach to GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          body_path: .github/release-notes.md

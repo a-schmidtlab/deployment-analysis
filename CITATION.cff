@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Deployment Analyzer"
+abstract: "Heatmap analysis of image deployment delays (arrival to activation) from editorial system exports."
+type: software
+authors:
+  - family-names: Schmidt
+    given-names: Axel
+    orcid: "https://orcid.org/0009-0000-3192-9224"
+version: 2.0.0
+date-released: 2026-10-08
+license: PolyForm-Noncommercial-1.0.0
+repository-code: "https://github.com/a-schmidtlab/deployment-analysis"
+keywords:
+  - heatmap
+  - latency analysis
+  - editorial systems
+  - IPTC

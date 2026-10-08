@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deployment-analyzer"
+dynamic = ["version"]
+description = "Heatmap analysis of image deployment delays (arrival to activation) from editorial system exports"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Axel Schmidt" }]
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: X11 Applications",
+    "Environment :: Win32 (MS Windows)",
+    "Intended Audience :: System Administrators",
+    "License :: Other/Proprietary License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+dependencies = [
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "matplotlib>=3.7",
+    "seaborn>=0.12",
+    "openpyxl>=3.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "ruff>=0.4"]
+build = ["pyinstaller>=6"]
+
+[project.scripts]
+deployment-analyzer = "deployment_analyzer.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/a-schmidtlab/deployment-analysis"
+Changelog = "https://github.com/a-schmidtlab/deployment-analysis/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = { attr = "deployment_analyzer.__version__" }
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["packaging/*.spec"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["error::DeprecationWarning:deployment_analyzer"]
