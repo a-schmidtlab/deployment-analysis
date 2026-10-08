@@ -4,6 +4,11 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to create and release (e.g. v2.0.0); empty = build only"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -32,8 +37,11 @@ jobs:
           name: DeploymentAnalyzer-win64
           path: dist/*.zip
       - name: Attach to GitHub release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          name: Deployment Analyzer ${{ inputs.tag || github.ref_name }}
           files: dist/*.zip
           body_path: .github/release-notes.md
