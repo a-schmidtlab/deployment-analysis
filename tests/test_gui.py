@@ -1,5 +1,12 @@
-"""Smoke test of the GUI; skipped where Tk or a display is unavailable."""
+"""Smoke test of the GUI; skipped where Tk or a display is unavailable.
 
+Creating several ``tk.Tk()`` instances in one process is unreliable on Windows
+("invalid command name tcl_findLibrary"), so all tests share one Tk interpreter
+and each app gets its own ``Toplevel``.
+"""
+
+import subprocess
+import sys
 import time
 
 import pytest
@@ -7,15 +14,23 @@ import pytest
 tk = pytest.importorskip("tkinter")
 
 
-@pytest.fixture
-def root():
+@pytest.fixture(scope="session")
+def tk_root():
     try:
-        window = tk.Tk()
+        interpreter = tk.Tk()
     except tk.TclError as exc:
         pytest.skip(f"no display: {exc}")
-    window.withdraw()
+    interpreter.withdraw()
+    yield interpreter
+    interpreter.destroy()
+
+
+@pytest.fixture
+def root(tk_root):
+    window = tk.Toplevel(tk_root)
     yield window
-    window.destroy()
+    if window.winfo_exists():
+        window.destroy()
 
 
 def test_app_loads_file_and_renders(root, csv_path):
@@ -64,7 +79,13 @@ def test_app_skips_duplicate_on_add(root, csv_path, tmp_path):
     assert "duplicates" in app.status.get()
 
 
-def test_cli_self_test(root):
-    from deployment_analyzer.cli import main
-
-    assert main(["--self-test"]) == 0
+def test_cli_self_test(tk_root):
+    """The check used by the release build; separate process for a fresh Tk."""
+    result = subprocess.run(
+        [sys.executable, "-m", "deployment_analyzer", "--self-test"],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "self-test passed" in result.stderr
